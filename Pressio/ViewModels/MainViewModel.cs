@@ -511,6 +511,32 @@ public class MainViewModel : ViewModelBase
 
     private void RefreshDashboard()
     {
+        var ordered = Measurements.OrderBy(x => x.MeasuredAt).ToList();
+        BeforeMedicationSummary = SummarizeByMedication(ordered, MedicationTiming.BeforeMedication);
+        AfterMedicationSummary = SummarizeByMedication(ordered, MedicationTiming.AfterMedication);
+        TimeDistribution = BuildTimeDistribution(ordered);
+        ContextCounts = BuildContextCounts(ordered);
+        if (ordered.Count == 0)
+        {
+            SystolicLine = new StreamGeometry();
+            DiastolicLine = new StreamGeometry();
+            ChartLabels.Clear();
+        }
+        else
+        {
+            var min = ordered.Min(x => Math.Min(x.Systolic, x.Diastolic));
+            var max = Math.Max(min + 1, ordered.Max(x => Math.Max(x.Systolic, x.Diastolic)));
+            double X(int i) => ordered.Count == 1 ? 250 : i * 500d / (ordered.Count - 1);
+            double Y(int v) => 138 - ((v - min) * 108d / (max - min));
+            var systolic = ordered.Select((x, i) => new Point(X(i), Y(x.Systolic))).ToList();
+            var diastolic = ordered.Select((x, i) => new Point(X(i), Y(x.Diastolic))).ToList();
+            SystolicLine = ChartPathBuilder.BuildSmooth(systolic);
+            DiastolicLine = ChartPathBuilder.BuildSmooth(diastolic);
+            ChartLabels.Clear();
+            for (var i = 0; i < ordered.Count; i++)
+                ChartLabels.Add(new ChartPointLabel(FormatPressure(ordered[i].Systolic, ordered[i].Diastolic), (int)Math.Clamp(X(i) - 26, 4, 442), (int)Math.Clamp(Y(ordered[i].Systolic) - 26, 4, 134)));
+        }
+
         this.RaisePropertyChanged(nameof(LastReading));
         this.RaisePropertyChanged(nameof(LastReadingDetails));
         this.RaisePropertyChanged(nameof(WeeklySummary));
@@ -520,27 +546,6 @@ public class MainViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(AfterMedicationSummary));
         this.RaisePropertyChanged(nameof(TimeDistribution));
         this.RaisePropertyChanged(nameof(ContextCounts));
-        this.RaisePropertyChanged(nameof(SystolicLine));
-        this.RaisePropertyChanged(nameof(DiastolicLine));
-        this.RaisePropertyChanged(nameof(ChartLabels));
-
-        var ordered = Measurements.OrderBy(x => x.MeasuredAt).ToList();
-        BeforeMedicationSummary = SummarizeByMedication(ordered, MedicationTiming.BeforeMedication);
-        AfterMedicationSummary = SummarizeByMedication(ordered, MedicationTiming.AfterMedication);
-        TimeDistribution = BuildTimeDistribution(ordered);
-        ContextCounts = BuildContextCounts(ordered);
-        if (ordered.Count == 0) { SystolicLine = new StreamGeometry(); DiastolicLine = new StreamGeometry(); ChartLabels.Clear(); return; }
-        var min = ordered.Min(x => Math.Min(x.Systolic, x.Diastolic));
-        var max = Math.Max(min + 1, ordered.Max(x => Math.Max(x.Systolic, x.Diastolic)));
-        double X(int i) => ordered.Count == 1 ? 250 : i * 500d / (ordered.Count - 1);
-        double Y(int v) => 138 - ((v - min) * 108d / (max - min));
-        var systolic = ordered.Select((x, i) => new Point(X(i), Y(x.Systolic))).ToList();
-        var diastolic = ordered.Select((x, i) => new Point(X(i), Y(x.Diastolic))).ToList();
-        SystolicLine = ChartPathBuilder.BuildSmooth(systolic);
-        DiastolicLine = ChartPathBuilder.BuildSmooth(diastolic);
-        ChartLabels.Clear();
-        for (var i = 0; i < ordered.Count; i++)
-            ChartLabels.Add(new ChartPointLabel(Math.Clamp(X(i) - 26, 4, 442), Math.Clamp(Y(ordered[i].Systolic) - 26, 4, 134), FormatPressure(ordered[i].Systolic, ordered[i].Diastolic)));
     }
 
     private static string FormatPressure(int systolic, int diastolic) => BloodPressureMeasurement.UseShorthandFormat
