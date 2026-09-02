@@ -85,6 +85,15 @@ public class MainViewModel : ViewModelBase
     private string _reportPeriod = "Todo o histórico";
     private DateTime? _reportStartDate = DateTime.Today.AddDays(-30);
     private DateTime? _reportEndDate = DateTime.Today;
+    private readonly ReminderRepository _reminderRepository = new();
+    private bool _isRemindersVisible;
+    private bool _isReminderFormVisible;
+    private bool _editingReminder;
+    private ReminderItem? _selectedReminder;
+    private TimeSpan? _reminderTime;
+    private bool _reminderEnabled = true;
+    private string _reminderNote = string.Empty;
+    private readonly HashSet<(long Id, DateTime Date)> _firedReminders = new();
 
     public bool IsMeasurementFormVisible
     {
@@ -238,6 +247,23 @@ public class MainViewModel : ViewModelBase
     public bool IsCustomReportPeriod => ReportPeriod == "Período personalizado";
     public DateTime? ReportStartDate { get => _reportStartDate; set => this.RaiseAndSetIfChanged(ref _reportStartDate, value); }
     public DateTime? ReportEndDate { get => _reportEndDate; set => this.RaiseAndSetIfChanged(ref _reportEndDate, value); }
+    public ObservableCollection<ReminderItem> Reminders { get; } = new();
+    public ObservableCollection<ReminderDayOption> ReminderDayOptions { get; } = new();
+    public ReminderItem? SelectedReminder { get => _selectedReminder; set => this.RaiseAndSetIfChanged(ref _selectedReminder, value); }
+    public bool IsRemindersVisible { get => _isRemindersVisible; private set { this.RaiseAndSetIfChanged(ref _isRemindersVisible, value); this.RaisePropertyChanged(nameof(IsRemindersDialogVisible)); this.RaisePropertyChanged(nameof(IsRemindersMobilePageVisible)); } }
+    public bool IsRemindersDialogVisible => IsRemindersVisible && !IsMobileLayout;
+    public bool IsRemindersMobilePageVisible => IsRemindersVisible && IsMobileLayout;
+    public bool IsReminderFormVisible
+    {
+        get => _isReminderFormVisible;
+        private set { this.RaiseAndSetIfChanged(ref _isReminderFormVisible, value); this.RaisePropertyChanged(nameof(IsReminderFormDialogVisible)); this.RaisePropertyChanged(nameof(IsReminderFormMobilePageVisible)); }
+    }
+    public bool IsReminderFormDialogVisible => IsReminderFormVisible && !IsMobileLayout;
+    public bool IsReminderFormMobilePageVisible => IsReminderFormVisible && IsMobileLayout;
+    public TimeSpan? ReminderTime { get => _reminderTime; set => this.RaiseAndSetIfChanged(ref _reminderTime, value); }
+    public bool ReminderEnabled { get => _reminderEnabled; set => this.RaiseAndSetIfChanged(ref _reminderEnabled, value); }
+    public string ReminderNote { get => _reminderNote; set => this.RaiseAndSetIfChanged(ref _reminderNote, value); }
+    public Interaction<Reminder, Unit> ReminderBannerInteraction { get; } = new();
 
     public ReactiveCommand<Unit, Unit> ShowMeasurementFormCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> CancelMeasurementCommand { get; private set; } = null!;
@@ -260,6 +286,13 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<string, Unit> SelectPrimaryColorCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ConfirmDeleteCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> CancelDeleteCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> ShowRemindersCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> CloseRemindersCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> ShowReminderFormCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> CancelReminderFormCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> SaveReminderCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> EditReminderCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> DeleteReminderCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ClearFiltersCommand { get; private set; } = null!;
 
     private void Initialize()
@@ -318,6 +351,23 @@ public class MainViewModel : ViewModelBase
             FilterTimeOfDay = "Todos os horários";
             FilterSearch = string.Empty;
         });
+        ShowRemindersCommand = ReactiveCommand.Create(() => { IsRemindersVisible = true; ReloadReminders(); });
+        CloseRemindersCommand = ReactiveCommand.Create(() => { IsRemindersVisible = false; IsReminderFormVisible = false; });
+        ShowReminderFormCommand = ReactiveCommand.Create(() =>
+        {
+            _editingReminder = false;
+            ReminderTime = DateTime.Now.TimeOfDay;
+            ReminderEnabled = true;
+            ReminderNote = string.Empty;
+            SetReminderDays(ReminderDays.All);
+            IsReminderFormVisible = true;
+        });
+        CancelReminderFormCommand = ReactiveCommand.Create(() => { IsReminderFormVisible = false; });
+        SaveReminderCommand = ReactiveCommand.Create(SaveReminder);
+        EditReminderCommand = ReactiveCommand.Create(EditReminder);
+        DeleteReminderCommand = ReactiveCommand.Create(DeleteSelectedReminder);
+        foreach (var day in ReminderInfo.AllDays) ReminderDayOptions.Add(new ReminderDayOption(day.Value, day.Label));
+        try { Observable.Interval(TimeSpan.FromSeconds(20), RxApp.MainThreadScheduler).Subscribe(_ => CheckDueReminders()); } catch { }
         ExportCsvCommand = ReactiveCommand.CreateFromTask(ExportCsv);
         ExportPdfCommand = ReactiveCommand.CreateFromTask(ExportPdf);
         foreach (var option in MeasurementContextInfo.AllContexts) ContextOptions.Add(new ContextOption(option.Value, option.Label));
@@ -691,6 +741,97 @@ public class MainViewModel : ViewModelBase
         "Deitado" => BodyPosition.Lying,
         "Em pé" => BodyPosition.Standing,
         _ => BodyPosition.NotInformed
+    };
+
+    private void ReloadReminders()
+    {
+        Reminders.Clear();
+        foreach (var reminder in _reminderRepository.GetAll())
+            Reminders.Add(new ReminderItem(reminder, PersistReminderEnabled));
+    }
+
+    private void PersistReminderEnabled(ReminderItem item) => _reminderRepository.Update(new Reminder(item.Id, item.Time, item.Days, item.Enabled, item.Note));
+
+    private ReminderDays SelectedDays()
+    {
+        var result = ReminderDays.None;
+        foreach (var option in ReminderDayOptions)
+            if (option.IsSelected) result |= option.Value;
+        return result;
+    }
+
+    private void SetReminderDays(ReminderDays days)
+    {
+        foreach (var option in ReminderDayOptions)
+            option.IsSelected = (days & option.Value) != 0;
+    }
+
+    private void SaveReminder()
+    {
+        var time = ReminderTime ?? DateTime.Now.TimeOfDay;
+        var days = SelectedDays();
+        if (days == ReminderDays.None) days = ReminderDays.All;
+        var note = string.IsNullOrWhiteSpace(ReminderNote) ? null : ReminderNote.Trim();
+        if (_editingReminder && SelectedReminder is { } selected)
+        {
+            var updated = new Reminder(selected.Id, time, days, ReminderEnabled, note);
+            _reminderRepository.Update(updated);
+            var index = Reminders.IndexOf(selected);
+            Reminders[index] = new ReminderItem(updated, PersistReminderEnabled);
+            SelectedReminder = Reminders[index];
+        }
+        else
+        {
+            var id = _reminderRepository.Add(new Reminder(0, time, days, ReminderEnabled, note));
+            var item = new ReminderItem(new Reminder(id, time, days, ReminderEnabled, note), PersistReminderEnabled);
+            Reminders.Add(item);
+            SelectedReminder = item;
+        }
+        IsReminderFormVisible = false;
+    }
+
+    private void EditReminder()
+    {
+        if (SelectedReminder is not { } item) return;
+        _editingReminder = true;
+        ReminderTime = item.Time;
+        ReminderEnabled = item.Enabled;
+        ReminderNote = item.Note ?? string.Empty;
+        SetReminderDays(item.Days);
+        IsReminderFormVisible = true;
+    }
+
+    private void DeleteSelectedReminder()
+    {
+        if (SelectedReminder is not { Id: > 0 } item) return;
+        _reminderRepository.Delete(item.Id);
+        Reminders.Remove(item);
+        SelectedReminder = null;
+    }
+
+    private void CheckDueReminders()
+    {
+        var now = DateTime.Now;
+        var dayFlag = NowToReminderDay(now.DayOfWeek);
+        foreach (var item in Reminders)
+        {
+            if (!item.Enabled || item.Days == ReminderDays.None || (item.Days & dayFlag) == 0) continue;
+            if (Math.Abs((item.Time - now.TimeOfDay).TotalMinutes) >= 1) continue;
+            if (!_firedReminders.Add((item.Id, now.Date))) continue;
+            ReminderBannerInteraction.Handle(new Reminder(item.Id, item.Time, item.Days, item.Enabled, item.Note)).Subscribe();
+        }
+    }
+
+    private static ReminderDays NowToReminderDay(DayOfWeek day) => day switch
+    {
+        DayOfWeek.Sunday => ReminderDays.Sunday,
+        DayOfWeek.Monday => ReminderDays.Monday,
+        DayOfWeek.Tuesday => ReminderDays.Tuesday,
+        DayOfWeek.Wednesday => ReminderDays.Wednesday,
+        DayOfWeek.Thursday => ReminderDays.Thursday,
+        DayOfWeek.Friday => ReminderDays.Friday,
+        DayOfWeek.Saturday => ReminderDays.Saturday,
+        _ => ReminderDays.None
     };
 
     private static string DescribeMedicationTiming(MedicationTiming timing) => timing switch
