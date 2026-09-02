@@ -72,6 +72,7 @@ public class MainViewModel : ViewModelBase
     private bool _editingMeasurement;
     private bool _isSettingsVisible;
     private bool _isAboutVisible;
+    private bool _isAboutSplash = true;
     private string _selectedAppearance = "Claro";
     private string _selectedPrimaryColor = "Índigo";
     private string _selectedDisplayFormat = "13/8";
@@ -211,6 +212,7 @@ public class MainViewModel : ViewModelBase
     public bool IsAboutVisible { get => _isAboutVisible; private set { this.RaiseAndSetIfChanged(ref _isAboutVisible, value); this.RaisePropertyChanged(nameof(IsAboutDialogVisible)); this.RaisePropertyChanged(nameof(IsAboutMobilePageVisible)); } }
     public bool IsAboutDialogVisible => IsAboutVisible && !IsMobileLayout;
     public bool IsAboutMobilePageVisible => IsAboutVisible && IsMobileLayout;
+    public bool IsAboutCloseVisible => !_isAboutSplash;
     public IReadOnlyList<string> AppearanceOptions { get; } = new[] { "Claro", "Escuro" };
     public IReadOnlyList<string> PrimaryColorOptions { get; } = new[] { "Índigo", "Azul", "Verde", "Roxo", "Coral" };
     public string SelectedAppearance
@@ -353,7 +355,7 @@ public class MainViewModel : ViewModelBase
         });
         CloseSettingsCommand = ReactiveCommand.Create(() => { IsSettingsVisible = false; });
         SelectPrimaryColorCommand = ReactiveCommand.Create<string>(color => SelectedPrimaryColor = color);
-        ShowAboutCommand = ReactiveCommand.Create(() => { IsAboutVisible = true; });
+        ShowAboutCommand = ReactiveCommand.Create(() => { _isAboutSplash = false; this.RaisePropertyChanged(nameof(IsAboutCloseVisible)); IsAboutVisible = true; });
         CloseAboutCommand = ReactiveCommand.Create(() => { IsAboutVisible = false; });
         CancelDeleteCommand = ReactiveCommand.Create(() => { IsConfirmDialogVisible = false; });
         ConfirmDeleteCommand = ReactiveCommand.Create(ExecuteConfirmedDelete);
@@ -383,8 +385,10 @@ public class MainViewModel : ViewModelBase
         foreach (var day in ReminderInfo.AllDays) ReminderDayOptions.Add(new ReminderDayOption(day.Value, day.Label));
         try { Observable.Interval(TimeSpan.FromSeconds(20), RxApp.MainThreadScheduler).Subscribe(_ => CheckDueReminders()); } catch { }
         RescheduleEnabledReminders();
+        _isAboutSplash = true;
+        this.RaisePropertyChanged(nameof(IsAboutCloseVisible));
         IsAboutVisible = true;
-        Observable.Timer(TimeSpan.FromMilliseconds(1800), RxApp.MainThreadScheduler).Subscribe(_ => { IsAboutVisible = false; });
+        Observable.Timer(TimeSpan.FromMilliseconds(1800), RxApp.MainThreadScheduler).Subscribe(_ => { _isAboutSplash = false; this.RaisePropertyChanged(nameof(IsAboutCloseVisible)); IsAboutVisible = false; });
         ExportCsvCommand = ReactiveCommand.CreateFromTask(ExportCsv);
         ExportPdfCommand = ReactiveCommand.CreateFromTask(ExportPdf);
         foreach (var option in MeasurementContextInfo.AllContexts) ContextOptions.Add(new ContextOption(option.Value, option.Label));

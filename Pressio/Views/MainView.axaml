@@ -150,7 +150,7 @@
           <TextBlock Text="E-mail: sergio_luiz@outlook.com" FontSize="13" Foreground="{DynamicResource PressioMutedBrush}" HorizontalAlignment="Center" />
           <TextBlock Text="WhatsApp: (16) 99181-3623" FontSize="13" Foreground="{DynamicResource PressioMutedBrush}" HorizontalAlignment="Center" />
           <TextBlock Text="Versão 1.0" FontSize="11" Foreground="{DynamicResource PressioMutedBrush}" HorizontalAlignment="Center" Margin="0,8,0,0" />
-          <Button Classes="primary-button" Content="Fechar" Command="{Binding CloseAboutCommand}" HorizontalContentAlignment="Center" />
+          <Button Classes="primary-button" Content="Fechar" Command="{Binding CloseAboutCommand}" HorizontalContentAlignment="Center" IsVisible="{Binding IsAboutCloseVisible}" />
         </StackPanel>
       </Border>
     </Grid>
@@ -165,7 +165,7 @@
         <TextBlock Text="E-mail: sergio_luiz@outlook.com" FontSize="13" Foreground="{DynamicResource PressioMutedBrush}" HorizontalAlignment="Center" />
         <TextBlock Text="WhatsApp: (16) 99181-3623" FontSize="13" Foreground="{DynamicResource PressioMutedBrush}" HorizontalAlignment="Center" />
         <TextBlock Text="Versão 1.0" FontSize="11" Foreground="{DynamicResource PressioMutedBrush}" HorizontalAlignment="Center" Margin="0,8,0,0" />
-        <Button Classes="primary-button" Content="Fechar" Command="{Binding CloseAboutCommand}" HorizontalContentAlignment="Center" Padding="16" />
+        <Button Classes="primary-button" Content="Fechar" Command="{Binding CloseAboutCommand}" HorizontalContentAlignment="Center" Padding="16" IsVisible="{Binding IsAboutCloseVisible}" />
       </StackPanel></ScrollViewer>
     </Grid>
     <Grid Grid.RowSpan="2" IsVisible="{Binding IsConfirmDialogVisible}" Background="#8A171A2F">
