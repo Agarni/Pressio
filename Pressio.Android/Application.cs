@@ -2,6 +2,7 @@
 using Android.Runtime;
 using Avalonia;
 using Avalonia.Android;
+using Pressio.Services;
 using ReactiveUI.Avalonia;
 
 namespace Pressio.Android
@@ -15,6 +16,7 @@ namespace Pressio.Android
 
         protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)
         {
+            Notifications.Service = new AndroidNotificationService(this);
             return base.CustomizeAppBuilder(builder)
             .WithInterFont()
             .UseReactiveUI();

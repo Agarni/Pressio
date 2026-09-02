@@ -374,6 +374,7 @@ public class MainViewModel : ViewModelBase
         DismissReminderNoticeCommand = ReactiveCommand.Create(() => { IsReminderNoticeVisible = false; });
         foreach (var day in ReminderInfo.AllDays) ReminderDayOptions.Add(new ReminderDayOption(day.Value, day.Label));
         try { Observable.Interval(TimeSpan.FromSeconds(20), RxApp.MainThreadScheduler).Subscribe(_ => CheckDueReminders()); } catch { }
+        RescheduleEnabledReminders();
         ExportCsvCommand = ReactiveCommand.CreateFromTask(ExportCsv);
         ExportPdfCommand = ReactiveCommand.CreateFromTask(ExportPdf);
         foreach (var option in MeasurementContextInfo.AllContexts) ContextOptions.Add(new ContextOption(option.Value, option.Label));
@@ -756,7 +757,12 @@ public class MainViewModel : ViewModelBase
             Reminders.Add(new ReminderItem(reminder, PersistReminderEnabled));
     }
 
-    private void PersistReminderEnabled(ReminderItem item) => _reminderRepository.Update(new Reminder(item.Id, item.Time, item.Days, item.Enabled, item.Note));
+    private void PersistReminderEnabled(ReminderItem item)
+    {
+        _reminderRepository.Update(new Reminder(item.Id, item.Time, item.Days, item.Enabled, item.Note));
+        if (item.Enabled) _ = Notifications.Service.ScheduleAsync(new Reminder(item.Id, item.Time, item.Days, item.Enabled, item.Note));
+        else _ = Notifications.Service.CancelAsync(item.Id);
+    }
 
     private ReminderDays SelectedDays()
     {
@@ -785,13 +791,16 @@ public class MainViewModel : ViewModelBase
             var index = Reminders.IndexOf(selected);
             Reminders[index] = new ReminderItem(updated, PersistReminderEnabled);
             SelectedReminder = Reminders[index];
+            _ = Notifications.Service.ScheduleAsync(updated);
         }
         else
         {
             var id = _reminderRepository.Add(new Reminder(0, time, days, ReminderEnabled, note));
-            var item = new ReminderItem(new Reminder(id, time, days, ReminderEnabled, note), PersistReminderEnabled);
+            var reminder = new Reminder(id, time, days, ReminderEnabled, note);
+            var item = new ReminderItem(reminder, PersistReminderEnabled);
             Reminders.Add(item);
             SelectedReminder = item;
+            _ = Notifications.Service.ScheduleAsync(reminder);
         }
         IsReminderFormVisible = false;
     }
@@ -811,8 +820,15 @@ public class MainViewModel : ViewModelBase
     {
         if (SelectedReminder is not { Id: > 0 } item) return;
         _reminderRepository.Delete(item.Id);
+        _ = Notifications.Service.CancelAsync(item.Id);
         Reminders.Remove(item);
         SelectedReminder = null;
+    }
+
+    private void RescheduleEnabledReminders()
+    {
+        foreach (var reminder in _reminderRepository.GetAll())
+            if (reminder.Enabled) _ = Notifications.Service.ScheduleAsync(reminder);
     }
 
     private void CheckDueReminders()
@@ -824,8 +840,10 @@ public class MainViewModel : ViewModelBase
             if (!item.Enabled || item.Days == ReminderDays.None || (item.Days & dayFlag) == 0) continue;
             if (Math.Abs((item.Time - now.TimeOfDay).TotalMinutes) >= 1) continue;
             if (!_firedReminders.Add((item.Id, now.Date))) continue;
-            ReminderNoticeMessage = "" + item.DisplayTime + " — hora de aferir a pressão" + (string.IsNullOrWhiteSpace(item.Note) ? "" : "\n" + item.Note);
+            var message = "" + item.DisplayTime + " — hora de aferir a pressão" + (string.IsNullOrWhiteSpace(item.Note) ? "" : "\n" + item.Note);
+            ReminderNoticeMessage = message;
             IsReminderNoticeVisible = true;
+            _ = Notifications.Service.ShowNowAsync("Pressio", message);
         }
     }
 
