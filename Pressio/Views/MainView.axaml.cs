@@ -1,5 +1,4 @@
 using System;
-using System.Reactive;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -64,26 +63,6 @@ public partial class MainView : UserControl
             no.Click += (_, _) => dialog.Close(false);
 
             ctx.SetOutput(await dialog.ShowDialog<bool>(owner));
-        });
-
-        vm.ReminderBannerInteraction.RegisterHandler(async ctx =>
-        {
-            if (TopLevel.GetTopLevel(this) is Window owner)
-            {
-                var message = ctx.Input.DisplayTime + " — hora de aferir a pressão";
-                if (!string.IsNullOrWhiteSpace(ctx.Input.Note)) message += "\n" + ctx.Input.Note;
-
-                var panel = new StackPanel { Margin = new Thickness(20), Spacing = 14 };
-                panel.Children.Add(new TextBlock { Text = "Lembrete de aferição", FontWeight = FontWeight.SemiBold, FontSize = 16 });
-                panel.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap });
-                var ok = new Button { Content = "OK", Classes = { "primary-button" }, HorizontalAlignment = HorizontalAlignment.Right };
-                panel.Children.Add(ok);
-
-                var dialog = new Window { Width = 340, Height = 190, CanResize = false, Title = "Pressio", Content = panel };
-                ok.Click += (_, _) => dialog.Close(true);
-                await dialog.ShowDialog<bool>(owner);
-            }
-            ctx.SetOutput(Unit.Default);
         });
     }
 }

@@ -93,6 +93,8 @@ public class MainViewModel : ViewModelBase
     private TimeSpan? _reminderTime;
     private bool _reminderEnabled = true;
     private string _reminderNote = string.Empty;
+    private bool _isReminderNoticeVisible;
+    private string _reminderNoticeMessage = string.Empty;
     private readonly HashSet<(long Id, DateTime Date)> _firedReminders = new();
 
     public bool IsMeasurementFormVisible
@@ -263,7 +265,9 @@ public class MainViewModel : ViewModelBase
     public TimeSpan? ReminderTime { get => _reminderTime; set => this.RaiseAndSetIfChanged(ref _reminderTime, value); }
     public bool ReminderEnabled { get => _reminderEnabled; set => this.RaiseAndSetIfChanged(ref _reminderEnabled, value); }
     public string ReminderNote { get => _reminderNote; set => this.RaiseAndSetIfChanged(ref _reminderNote, value); }
-    public Interaction<Reminder, Unit> ReminderBannerInteraction { get; } = new();
+    public bool IsReminderNoticeVisible { get => _isReminderNoticeVisible; private set => this.RaiseAndSetIfChanged(ref _isReminderNoticeVisible, value); }
+    public string ReminderNoticeMessage { get => _reminderNoticeMessage; set => this.RaiseAndSetIfChanged(ref _reminderNoticeMessage, value); }
+
 
     public ReactiveCommand<Unit, Unit> ShowMeasurementFormCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> CancelMeasurementCommand { get; private set; } = null!;
@@ -293,6 +297,7 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> SaveReminderCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> EditReminderCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> DeleteReminderCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> DismissReminderNoticeCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ClearFiltersCommand { get; private set; } = null!;
 
     private void Initialize()
@@ -366,6 +371,7 @@ public class MainViewModel : ViewModelBase
         SaveReminderCommand = ReactiveCommand.Create(SaveReminder);
         EditReminderCommand = ReactiveCommand.Create(EditReminder);
         DeleteReminderCommand = ReactiveCommand.Create(DeleteSelectedReminder);
+        DismissReminderNoticeCommand = ReactiveCommand.Create(() => { IsReminderNoticeVisible = false; });
         foreach (var day in ReminderInfo.AllDays) ReminderDayOptions.Add(new ReminderDayOption(day.Value, day.Label));
         try { Observable.Interval(TimeSpan.FromSeconds(20), RxApp.MainThreadScheduler).Subscribe(_ => CheckDueReminders()); } catch { }
         ExportCsvCommand = ReactiveCommand.CreateFromTask(ExportCsv);
@@ -818,7 +824,8 @@ public class MainViewModel : ViewModelBase
             if (!item.Enabled || item.Days == ReminderDays.None || (item.Days & dayFlag) == 0) continue;
             if (Math.Abs((item.Time - now.TimeOfDay).TotalMinutes) >= 1) continue;
             if (!_firedReminders.Add((item.Id, now.Date))) continue;
-            ReminderBannerInteraction.Handle(new Reminder(item.Id, item.Time, item.Days, item.Enabled, item.Note)).Subscribe();
+            ReminderNoticeMessage = "" + item.DisplayTime + " — hora de aferir a pressão" + (string.IsNullOrWhiteSpace(item.Note) ? "" : "\n" + item.Note);
+            IsReminderNoticeVisible = true;
         }
     }
 
