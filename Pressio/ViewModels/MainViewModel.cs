@@ -6,6 +6,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.IO;
 using Avalonia;
+using Avalonia.Media;
 using Pressio.Models;
 using Pressio.Services;
 using ReactiveUI;
@@ -35,10 +36,11 @@ public class MainViewModel : ViewModelBase
     public string WeeklySummary => Measurements.Count == 0 ? "Registre a primeira medição" : $"{Measurements.Count} medições registradas";
     public string AverageReading => Measurements.Count == 0 ? "—" : $"{Measurements.Average(x => x.Systolic):0}/{Measurements.Average(x => x.Diastolic):0}";
     public string MeasurementCount => Measurements.Count.ToString();
-    private Points _chartPoints = new();
-    public Points ChartPoints { get => _chartPoints; private set => this.RaiseAndSetIfChanged(ref _chartPoints, value); }
-    private Points _diastolicChartPoints = new();
-    public Points DiastolicChartPoints { get => _diastolicChartPoints; private set => this.RaiseAndSetIfChanged(ref _diastolicChartPoints, value); }
+    private Geometry _systolicLine = new StreamGeometry();
+    public Geometry SystolicLine { get => _systolicLine; private set => this.RaiseAndSetIfChanged(ref _systolicLine, value); }
+    private Geometry _diastolicLine = new StreamGeometry();
+    public Geometry DiastolicLine { get => _diastolicLine; private set => this.RaiseAndSetIfChanged(ref _diastolicLine, value); }
+    public ObservableCollection<ChartPointLabel> ChartLabels { get; } = new();
     public string BeforeMedicationSummary { get; private set; } = "—";
     public string AfterMedicationSummary { get; private set; } = "—";
     public IReadOnlyList<TimeSlotInfo> TimeDistribution { get; private set; } = Array.Empty<TimeSlotInfo>();
@@ -518,18 +520,32 @@ public class MainViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(AfterMedicationSummary));
         this.RaisePropertyChanged(nameof(TimeDistribution));
         this.RaisePropertyChanged(nameof(ContextCounts));
+        this.RaisePropertyChanged(nameof(SystolicLine));
+        this.RaisePropertyChanged(nameof(DiastolicLine));
+        this.RaisePropertyChanged(nameof(ChartLabels));
 
         var ordered = Measurements.OrderBy(x => x.MeasuredAt).ToList();
         BeforeMedicationSummary = SummarizeByMedication(ordered, MedicationTiming.BeforeMedication);
         AfterMedicationSummary = SummarizeByMedication(ordered, MedicationTiming.AfterMedication);
         TimeDistribution = BuildTimeDistribution(ordered);
         ContextCounts = BuildContextCounts(ordered);
-        if (ordered.Count == 0) { ChartPoints = new Points(); DiastolicChartPoints = new Points(); return; }
+        if (ordered.Count == 0) { SystolicLine = new StreamGeometry(); DiastolicLine = new StreamGeometry(); ChartLabels.Clear(); return; }
         var min = ordered.Min(x => Math.Min(x.Systolic, x.Diastolic));
         var max = Math.Max(min + 1, ordered.Max(x => Math.Max(x.Systolic, x.Diastolic)));
-        ChartPoints = new Points(ordered.Select((x, i) => new Point(ordered.Count == 1 ? 250 : i * 500d / (ordered.Count - 1), 138 - ((x.Systolic - min) * 108d / (max - min)))));
-        DiastolicChartPoints = new Points(ordered.Select((x, i) => new Point(ordered.Count == 1 ? 250 : i * 500d / (ordered.Count - 1), 138 - ((x.Diastolic - min) * 108d / (max - min)))));
+        double X(int i) => ordered.Count == 1 ? 250 : i * 500d / (ordered.Count - 1);
+        double Y(int v) => 138 - ((v - min) * 108d / (max - min));
+        var systolic = ordered.Select((x, i) => new Point(X(i), Y(x.Systolic))).ToList();
+        var diastolic = ordered.Select((x, i) => new Point(X(i), Y(x.Diastolic))).ToList();
+        SystolicLine = ChartPathBuilder.BuildSmooth(systolic);
+        DiastolicLine = ChartPathBuilder.BuildSmooth(diastolic);
+        ChartLabels.Clear();
+        for (var i = 0; i < ordered.Count; i++)
+            ChartLabels.Add(new ChartPointLabel(Math.Clamp(X(i) - 26, 4, 442), Math.Clamp(Y(ordered[i].Systolic) - 26, 4, 134), FormatPressure(ordered[i].Systolic, ordered[i].Diastolic)));
     }
+
+    private static string FormatPressure(int systolic, int diastolic) => BloodPressureMeasurement.UseShorthandFormat
+        ? $"{systolic / 10d:0.#}/{diastolic / 10d:0.#}"
+        : $"{systolic}/{diastolic}";
 
     private static string SummarizeByMedication(IReadOnlyList<BloodPressureMeasurement> items, MedicationTiming timing)
     {
