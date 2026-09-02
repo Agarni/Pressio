@@ -126,6 +126,7 @@ public class MainViewModel : ViewModelBase
     public string Notes { get => _notes; set => this.RaiseAndSetIfChanged(ref _notes, value); }
     public ObservableCollection<BloodPressureMeasurement> Measurements { get; } = new();
     public ObservableCollection<Patient> Patients { get; } = new();
+    public ObservableCollection<ContextOption> ContextOptions { get; } = new();
     public Patient? SelectedPatient
     {
         get => _selectedPatient;
@@ -203,6 +204,7 @@ public class MainViewModel : ViewModelBase
             MeasurementDate = DateTime.Today;
             MeasurementTime = DateTime.Now.TimeOfDay;
             MedicationTiming = MedicationTiming.NotInformed;
+            SetContext(MeasurementContext.None);
             this.RaisePropertyChanged(nameof(SelectedMedicationOption));
             this.RaisePropertyChanged(nameof(MeasurementFormTitle));
             IsMeasurementFormVisible = true;
@@ -230,6 +232,7 @@ public class MainViewModel : ViewModelBase
         CancelDeleteCommand = ReactiveCommand.Create(() => { IsConfirmDialogVisible = false; });
         ConfirmDeleteCommand = ReactiveCommand.Create(ExecuteConfirmedDelete);
         ExportCsvCommand = ReactiveCommand.Create(ExportCsv);
+        foreach (var option in MeasurementContextInfo.AllContexts) ContextOptions.Add(new ContextOption(option.Value, option.Label));
         LoadAppSettings();
         foreach (var patient in _measurementRepository.GetPatients()) Patients.Add(patient);
         SelectedPatient = Patients.FirstOrDefault();
@@ -255,7 +258,8 @@ public class MainViewModel : ViewModelBase
         // Persistência será adicionada na próxima etapa; por enquanto o fluxo já valida
         // e confirma a medição para preparar a integração com o histórico.
         var measuredAt = (MeasurementDate ?? DateTime.Today).Date.Add(MeasurementTime ?? DateTime.Now.TimeOfDay);
-        var measurement = new BloodPressureMeasurement(parsed!.Systolic, parsed.Diastolic, measuredAt, MedicationTiming, string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim());
+        var context = SelectedContext();
+        var measurement = new BloodPressureMeasurement(parsed!.Systolic, parsed.Diastolic, measuredAt, MedicationTiming, string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim(), context);
         if (_editingMeasurement && SelectedMeasurement is { Id: > 0 } existing)
         {
             measurement = measurement with { Id = existing.Id };
@@ -375,6 +379,7 @@ public class MainViewModel : ViewModelBase
         MeasurementTime = measurement.MeasuredAt.TimeOfDay;
         MedicationTiming = measurement.MedicationTiming;
         Notes = measurement.Notes ?? string.Empty;
+        SetContext(measurement.Context);
         IsMeasurementFormVisible = true;
         this.RaisePropertyChanged(nameof(MeasurementFormTitle));
     }
@@ -399,6 +404,20 @@ public class MainViewModel : ViewModelBase
         var min = ordered.Min(x => x.Systolic);
         var max = Math.Max(min + 1, ordered.Max(x => x.Systolic));
         ChartPoints = new Points(ordered.Select((x, i) => new Point(ordered.Count == 1 ? 250 : i * 500d / (ordered.Count - 1), 138 - ((x.Systolic - min) * 108d / (max - min)))));
+    }
+
+    private MeasurementContext SelectedContext()
+    {
+        var result = MeasurementContext.None;
+        foreach (var option in ContextOptions)
+            if (option.IsSelected) result |= option.Context;
+        return result;
+    }
+
+    private void SetContext(MeasurementContext context)
+    {
+        foreach (var option in ContextOptions)
+            option.IsSelected = (context & option.Context) != 0;
     }
 
     private static string DescribeMedicationTiming(MedicationTiming timing) => timing switch

@@ -52,7 +52,7 @@ public sealed class MeasurementRepository
     public long Add(BloodPressureMeasurement measurement, long patientId)
     {
         using var connection = Open(); using var command = connection.CreateCommand();
-        command.CommandText = "INSERT INTO BloodPressureMeasurements (PatientId, Systolic, Diastolic, MeasuredAtUtc, MedicationTiming, Notes) VALUES ($patient, $systolic, $diastolic, $measuredAt, $medication, $notes); SELECT last_insert_rowid();";
+        command.CommandText = "INSERT INTO BloodPressureMeasurements (PatientId, Systolic, Diastolic, MeasuredAtUtc, MedicationTiming, Notes, Context) VALUES ($patient, $systolic, $diastolic, $measuredAt, $medication, $notes, $context); SELECT last_insert_rowid();";
         command.Parameters.AddWithValue("$patient", patientId); BindMeasurement(command, measurement);
         return (long)(command.ExecuteScalar() ?? 0L);
     }
@@ -60,33 +60,34 @@ public sealed class MeasurementRepository
     public IReadOnlyList<BloodPressureMeasurement> GetRecent(long patientId, int limit = 100)
     {
         using var connection = Open(); using var command = connection.CreateCommand();
-        command.CommandText = "SELECT Id, Systolic, Diastolic, MeasuredAtUtc, MedicationTiming, Notes FROM BloodPressureMeasurements WHERE PatientId=$patient ORDER BY MeasuredAtUtc DESC LIMIT $limit";
+        command.CommandText = "SELECT Id, Systolic, Diastolic, MeasuredAtUtc, MedicationTiming, Notes, Context FROM BloodPressureMeasurements WHERE PatientId=$patient ORDER BY MeasuredAtUtc DESC LIMIT $limit";
         command.Parameters.AddWithValue("$patient", patientId); command.Parameters.AddWithValue("$limit", limit);
         using var reader = command.ExecuteReader(); var items = new List<BloodPressureMeasurement>();
-        while (reader.Read()) items.Add(new BloodPressureMeasurement(reader.GetInt32(1), reader.GetInt32(2), DateTime.Parse(reader.GetString(3)).ToLocalTime(), Enum.Parse<MedicationTiming>(reader.GetString(4)), reader.IsDBNull(5) ? null : reader.GetString(5), reader.GetInt64(0)));
+        while (reader.Read()) items.Add(new BloodPressureMeasurement(reader.GetInt32(1), reader.GetInt32(2), DateTime.Parse(reader.GetString(3)).ToLocalTime(), Enum.Parse<MedicationTiming>(reader.GetString(4)), reader.IsDBNull(5) ? null : reader.GetString(5), (MeasurementContext)reader.GetInt32(6), reader.GetInt64(0)));
         return items;
     }
 
     public void Update(BloodPressureMeasurement measurement)
     {
         using var connection = Open(); using var command = connection.CreateCommand();
-        command.CommandText = "UPDATE BloodPressureMeasurements SET Systolic=$systolic, Diastolic=$diastolic, MeasuredAtUtc=$measuredAt, MedicationTiming=$medication, Notes=$notes WHERE Id=$id";
+        command.CommandText = "UPDATE BloodPressureMeasurements SET Systolic=$systolic, Diastolic=$diastolic, MeasuredAtUtc=$measuredAt, MedicationTiming=$medication, Notes=$notes, Context=$context WHERE Id=$id";
         BindMeasurement(command, measurement); command.Parameters.AddWithValue("$id", measurement.Id); command.ExecuteNonQuery();
     }
 
     public void Delete(long id) { using var connection = Open(); using var command = connection.CreateCommand(); command.CommandText = "DELETE FROM BloodPressureMeasurements WHERE Id=$id"; command.Parameters.AddWithValue("$id", id); command.ExecuteNonQuery(); }
     private SqliteConnection Open() { var connection = new SqliteConnection(_connectionString); connection.Open(); return connection; }
-    private static void BindMeasurement(SqliteCommand command, BloodPressureMeasurement m) { command.Parameters.AddWithValue("$systolic", m.Systolic); command.Parameters.AddWithValue("$diastolic", m.Diastolic); command.Parameters.AddWithValue("$measuredAt", m.MeasuredAt.ToUniversalTime().ToString("O")); command.Parameters.AddWithValue("$medication", m.MedicationTiming.ToString()); command.Parameters.AddWithValue("$notes", m.Notes ?? (object)DBNull.Value); }
+    private static void BindMeasurement(SqliteCommand command, BloodPressureMeasurement m) { command.Parameters.AddWithValue("$systolic", m.Systolic); command.Parameters.AddWithValue("$diastolic", m.Diastolic); command.Parameters.AddWithValue("$measuredAt", m.MeasuredAt.ToUniversalTime().ToString("O")); command.Parameters.AddWithValue("$medication", m.MedicationTiming.ToString()); command.Parameters.AddWithValue("$notes", m.Notes ?? (object)DBNull.Value); command.Parameters.AddWithValue("$context", (int)m.Context); }
     private void Initialize()
     {
         using var connection = Open(); using var command = connection.CreateCommand();
         command.CommandText = "CREATE TABLE IF NOT EXISTS Patients (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL, BirthDate TEXT NULL, Notes TEXT NULL); CREATE TABLE IF NOT EXISTS BloodPressureMeasurements (Id INTEGER PRIMARY KEY AUTOINCREMENT, PatientId INTEGER NOT NULL DEFAULT 1, Systolic INTEGER NOT NULL, Diastolic INTEGER NOT NULL, MeasuredAtUtc TEXT NOT NULL, MedicationTiming TEXT NOT NULL, Notes TEXT NULL);";
         command.ExecuteNonQuery();
         using var schema = connection.CreateCommand(); schema.CommandText = "PRAGMA table_info(BloodPressureMeasurements);";
-        using var reader = schema.ExecuteReader(); var hasPatientId = false;
-        while (reader.Read()) if (reader.GetString(1) == "PatientId") hasPatientId = true;
+        using var reader = schema.ExecuteReader(); var hasPatientId = false; var hasContext = false;
+        while (reader.Read()) { var name = reader.GetString(1); if (name == "PatientId") hasPatientId = true; if (name == "Context") hasContext = true; }
         reader.Close();
         if (!hasPatientId) { using var migration = connection.CreateCommand(); migration.CommandText = "ALTER TABLE BloodPressureMeasurements ADD COLUMN PatientId INTEGER NOT NULL DEFAULT 1"; migration.ExecuteNonQuery(); }
+        if (!hasContext) { using var migration = connection.CreateCommand(); migration.CommandText = "ALTER TABLE BloodPressureMeasurements ADD COLUMN Context INTEGER NOT NULL DEFAULT 0"; migration.ExecuteNonQuery(); }
         using var count = connection.CreateCommand(); count.CommandText = "SELECT COUNT(*) FROM Patients";
         if (Convert.ToInt64(count.ExecuteScalar()) == 0) AddPatient("Meu perfil", null, null);
     }

@@ -22,7 +22,7 @@ public static class BloodPressureParser
             return false;
         }
 
-        var parts = input.Trim().Replace('x', '/').Replace('X', '/').Split('/', StringSplitOptions.TrimEntries);
+        var parts = input.Split(new[] { '/', 'x', 'X', ' ' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (parts.Length != 2 || !int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var first) ||
             !int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var second))
         {

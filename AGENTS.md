@@ -38,14 +38,15 @@ The Avalonia packages (Avalonia, Themes.Fluent, Fonts.Inter, Desktop, iOS, Brows
 - SQLite via raw `Microsoft.Data.Sqlite` (no EF Core/Dapper, despite what `PRD.md` suggests).
 - DB file: `%LocalAppData%\Pressio\pressio.db`. Dates are stored as ISO-8601 strings; UTC on write, `.ToLocalTime()` on read.
 - Both `MeasurementRepository` and `SettingsRepository` open the same DB file, each computing its own connection string.
-- `MeasurementRepository.Initialize()` creates tables with `CREATE TABLE IF NOT EXISTS` plus a hand-rolled migration that checks `PRAGMA table_info` before `ALTER TABLE`. If you add a column, follow this same pattern.
+- `MeasurementRepository.Initialize()` creates tables with `CREATE TABLE IF NOT EXISTS` plus a hand-rolled migration that checks `PRAGMA table_info` before `ALTER TABLE`. If you add a column, follow this same pattern (the existing checks detect `PatientId` and `Context`; both are added with an explicit `ALTER TABLE` when missing).
+- `BloodPressureMeasurement` stores a `[Flags] MeasurementContext` (stress, pain, fever, exercise, caffeine, alcohol, smoking, poor sleep, missed medication, diet, symptoms, other) as an `INTEGER` bitmask in the `Context` column. `MeasurementContextInfo` maps values to Portuguese labels (`Describe`/`AllContexts`); the measurement form renders toggle chips from `ContextOption` (`MainViewModel.ContextOptions`).
 - `SettingsRepository` stores a simple key/value `Settings (Key TEXT PRIMARY KEY, Value TEXT)` table (used for theme + primary color via `SaveAppearance`). Appearance/primary color are loaded in `MainViewModel.LoadAppSettings()`, applied via `App.ApplyAppearance`, and applied+persisted **only** on confirming the Settings dialog (`SaveSettingsCommand`). Selecting a theme or a color swatch does NOT change the app before that (no live global preview); the selected color is indicated by a check inside the swatch via the `ColorMatchConverter`.
-- Reusable looks live in `App.axaml`: button style classes (`primary-button`, `secondary-button`, `danger-button`, `icon-button`, `color-swatch`) plus `ControlTheme`s like `PressioPrimaryButton`/`PressioColorSwatch`/`PressioIconButton`. Dialogs and cards should use the `Pressio*` `DynamicResource` brushes (surface/text/muted/primary/border/banner) so they adapt to light/dark — avoid hardcoded hex for surfaces/text.
+- Reusable looks live in `App.axaml`: button style classes (`primary-button`, `secondary-button`, `danger-button`, `icon-button`, `color-swatch`, `toggle-chip`) plus `ControlTheme`s like `PressioPrimaryButton`/`PressioColorSwatch`/`PressioIconButton`/`PressioToggleChip`. Dialogs and cards should use the `Pressio*` `DynamicResource` brushes (surface/text/muted/primary/border/banner) so they adapt to light/dark — avoid hardcoded hex for surfaces/text.
 - Deletes of patients and measurements are gated behind a confirmation overlay driven by `MainViewModel` (`ConfirmDeleteCommand`/`CancelDeleteCommand`, `IsConfirmDialogVisible`).
 
 ## Blood pressure parsing (`BloodPressureParser`)
 
-- Separators are `/`, `x`, `X` only — note **space is NOT** a separator despite `PRD.md`. Normalizes the shorthand `13/8` → `130/80` by multiplying by 10 when the value is `< 30`. Ranges: systolic 50–300, diastolic 30–200. Error/validation messages are user-friendly Portuguese.
+- Separators are `/`, space, `x`, `X` (matches `PRD.md`). Normalizes the shorthand `13/8` → `130/80` by multiplying by 10 when the value is `< 30`. Ranges: systolic 50–300, diastolic 30–200. Error/validation messages are user-friendly Portuguese.
 
 ## Architecture notes
 
