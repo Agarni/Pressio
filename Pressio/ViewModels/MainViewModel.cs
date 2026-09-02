@@ -37,6 +37,12 @@ public class MainViewModel : ViewModelBase
     public string MeasurementCount => Measurements.Count.ToString();
     private Points _chartPoints = new();
     public Points ChartPoints { get => _chartPoints; private set => this.RaiseAndSetIfChanged(ref _chartPoints, value); }
+    private Points _diastolicChartPoints = new();
+    public Points DiastolicChartPoints { get => _diastolicChartPoints; private set => this.RaiseAndSetIfChanged(ref _diastolicChartPoints, value); }
+    public string BeforeMedicationSummary { get; private set; } = "—";
+    public string AfterMedicationSummary { get; private set; } = "—";
+    public IReadOnlyList<TimeSlotInfo> TimeDistribution { get; private set; } = Array.Empty<TimeSlotInfo>();
+    public IReadOnlyList<ContextCountInfo> ContextCounts { get; private set; } = Array.Empty<ContextCountInfo>();
 
     private bool _isMeasurementFormVisible;
     private string _bloodPressureInput = string.Empty;
@@ -469,11 +475,47 @@ public class MainViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(WeeklySummary));
         this.RaisePropertyChanged(nameof(AverageReading));
         this.RaisePropertyChanged(nameof(MeasurementCount));
+        this.RaisePropertyChanged(nameof(BeforeMedicationSummary));
+        this.RaisePropertyChanged(nameof(AfterMedicationSummary));
+        this.RaisePropertyChanged(nameof(TimeDistribution));
+        this.RaisePropertyChanged(nameof(ContextCounts));
+
         var ordered = Measurements.OrderBy(x => x.MeasuredAt).ToList();
-        if (ordered.Count == 0) { ChartPoints = new Points(); return; }
-        var min = ordered.Min(x => x.Systolic);
-        var max = Math.Max(min + 1, ordered.Max(x => x.Systolic));
+        BeforeMedicationSummary = SummarizeByMedication(ordered, MedicationTiming.BeforeMedication);
+        AfterMedicationSummary = SummarizeByMedication(ordered, MedicationTiming.AfterMedication);
+        TimeDistribution = BuildTimeDistribution(ordered);
+        ContextCounts = BuildContextCounts(ordered);
+        if (ordered.Count == 0) { ChartPoints = new Points(); DiastolicChartPoints = new Points(); return; }
+        var min = ordered.Min(x => Math.Min(x.Systolic, x.Diastolic));
+        var max = Math.Max(min + 1, ordered.Max(x => Math.Max(x.Systolic, x.Diastolic)));
         ChartPoints = new Points(ordered.Select((x, i) => new Point(ordered.Count == 1 ? 250 : i * 500d / (ordered.Count - 1), 138 - ((x.Systolic - min) * 108d / (max - min)))));
+        DiastolicChartPoints = new Points(ordered.Select((x, i) => new Point(ordered.Count == 1 ? 250 : i * 500d / (ordered.Count - 1), 138 - ((x.Diastolic - min) * 108d / (max - min)))));
+    }
+
+    private static string SummarizeByMedication(IReadOnlyList<BloodPressureMeasurement> items, MedicationTiming timing)
+    {
+        var subset = items.Where(x => x.MedicationTiming == timing).ToList();
+        if (subset.Count == 0) return "—";
+        return $"{subset.Count}x  ·  média {subset.Average(x => x.Systolic):0}/{subset.Average(x => x.Diastolic):0}";
+    }
+
+    private static IReadOnlyList<TimeSlotInfo> BuildTimeDistribution(IReadOnlyList<BloodPressureMeasurement> items) => new[]
+    {
+        new TimeSlotInfo("Madrugada", items.Count(x => x.MeasuredAt.Hour < 6)),
+        new TimeSlotInfo("Manhã", items.Count(x => x.MeasuredAt.Hour >= 6 && x.MeasuredAt.Hour < 12)),
+        new TimeSlotInfo("Tarde", items.Count(x => x.MeasuredAt.Hour >= 12 && x.MeasuredAt.Hour < 18)),
+        new TimeSlotInfo("Noite", items.Count(x => x.MeasuredAt.Hour >= 18)),
+    };
+
+    private static IReadOnlyList<ContextCountInfo> BuildContextCounts(IReadOnlyList<BloodPressureMeasurement> items)
+    {
+        var result = new List<ContextCountInfo>();
+        foreach (var (value, label) in MeasurementContextInfo.AllContexts)
+        {
+            var count = items.Count(x => (x.Context & value) != 0);
+            if (count > 0) result.Add(new ContextCountInfo(label, count));
+        }
+        return result;
     }
 
     private MeasurementContext SelectedContext()
