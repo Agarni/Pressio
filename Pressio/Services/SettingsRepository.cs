@@ -19,12 +19,14 @@ public sealed class SettingsRepository
     public string GetAppearance() => Get("Appearance", "Claro");
     public string GetPrimaryColor() => Get("PrimaryColor", "Índigo");
     public string GetMeasurementDisplayFormat() => Get("MeasurementDisplayFormat", "13/8");
+    public string? GetLastExportDirectory() => Get("LastExportDirectory", string.Empty) is { Length: > 0 } dir ? dir : null;
     public void SaveAppearance(string appearance, string primaryColor)
     {
         Set("Appearance", appearance);
         Set("PrimaryColor", primaryColor);
     }
     public void SaveMeasurementDisplayFormat(string format) => Set("MeasurementDisplayFormat", format);
+    public void SaveLastExportDirectory(string directory) => Set("LastExportDirectory", directory);
 
     private string Get(string key, string defaultValue)
     {

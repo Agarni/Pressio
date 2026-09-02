@@ -1,10 +1,12 @@
 ﻿
 using System.Reactive;
+using System.Reactive.Linq;
 using System.Collections.Generic;
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.IO;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Media;
 using Pressio.Models;
@@ -234,6 +236,7 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> SavePatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ExportCsvCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ExportPdfCommand { get; private set; } = null!;
+    public Interaction<ExportFileRequest, string?> ExportFileInteraction { get; } = new();
     public ReactiveCommand<Unit, Unit> CancelPatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> EditPatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> DeletePatientCommand { get; private set; } = null!;
@@ -301,8 +304,8 @@ public class MainViewModel : ViewModelBase
             FilterTimeOfDay = "Todos os horários";
             FilterSearch = string.Empty;
         });
-        ExportCsvCommand = ReactiveCommand.Create(ExportCsv);
-        ExportPdfCommand = ReactiveCommand.Create(ExportPdf);
+        ExportCsvCommand = ReactiveCommand.CreateFromTask(ExportCsv);
+        ExportPdfCommand = ReactiveCommand.CreateFromTask(ExportPdf);
         foreach (var option in MeasurementContextInfo.AllContexts) ContextOptions.Add(new ContextOption(option.Value, option.Label));
         LoadAppSettings();
         foreach (var patient in _measurementRepository.GetPatients()) Patients.Add(patient);
@@ -393,26 +396,38 @@ public class MainViewModel : ViewModelBase
         IsPatientFormVisible = false;
     }
 
-    private void ExportCsv()
+    private async Task ExportCsv()
     {
         if (SelectedPatient is null || Measurements.Count == 0) { ExportStatus = "Não há medições para exportar."; return; }
-        var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Pressio");
-        Directory.CreateDirectory(directory);
-        var path = Path.Combine(directory, $"pressio-{SelectedPatient.Name.Replace(' ', '-')}-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
+        var path = await RequestExportPath("csv", "CSV");
+        if (path is null) { ExportStatus = "Exportação cancelada."; return; }
         var rows = new[] { "Pressão;Data e hora;Medicação;Contexto;Observação" }.Concat(Measurements.Select(m =>
             $"{m.DisplayValue};{m.DisplayDate};{DescribeMedicationTiming(m.MedicationTiming)};{(m.HasContext ? m.DisplayContext : "—")};{m.Notes?.Replace(';', ',') ?? string.Empty}"));
         File.WriteAllLines(path, rows);
+        SaveExportDirectory(path);
         ExportStatus = $"Relatório CSV salvo em: {path}";
     }
 
-    private void ExportPdf()
+    private async Task ExportPdf()
     {
         if (SelectedPatient is null || Measurements.Count == 0) { ExportStatus = "Não há medições para exportar."; return; }
-        var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Pressio");
-        Directory.CreateDirectory(directory);
-        var path = Path.Combine(directory, $"pressio-{SelectedPatient.Name.Replace(' ', '-')}-{DateTime.Now:yyyyMMdd-HHmmss}.pdf");
+        var path = await RequestExportPath("pdf", "PDF");
+        if (path is null) { ExportStatus = "Exportação cancelada."; return; }
         PdfReportService.Export(path, SelectedPatient, Measurements.ToList(), FilterDescription());
+        SaveExportDirectory(path);
         ExportStatus = $"Relatório PDF salvo em: {path}";
+    }
+
+    private async Task<string?> RequestExportPath(string extension, string kind)
+    {
+        var request = new ExportFileRequest($"pressio-{SelectedPatient!.Name.Replace(' ', '-')}-{DateTime.Now:yyyyMMdd-HHmmss}.{extension}", $".{extension}", kind, _settingsRepository.GetLastExportDirectory());
+        return await ExportFileInteraction.Handle(request).FirstAsync();
+    }
+
+    private void SaveExportDirectory(string path)
+    {
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(directory)) _settingsRepository.SaveLastExportDirectory(directory);
     }
 
     private string FilterDescription() => string.Join(" · ", new[]
