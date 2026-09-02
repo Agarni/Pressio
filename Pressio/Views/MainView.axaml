@@ -17,7 +17,7 @@
           <TextBlock Text="Acompanhamento da pressão" FontWeight="SemiBold" FontSize="22" Foreground="{DynamicResource PressioTextBrush}" />
         </StackPanel>
         <WrapPanel VerticalAlignment="Center" HorizontalAlignment="Left" ItemHeight="36" Orientation="Horizontal">
-          <ComboBox ItemsSource="{Binding Patients}" SelectedItem="{Binding SelectedPatient}" DisplayMemberBinding="{Binding DisplayName}" Width="220" Margin="0,0,10,0" />
+          <ComboBox ItemsSource="{Binding Patients}" SelectedItem="{Binding SelectedPatient}" DisplayMemberBinding="{Binding DisplayName}" Width="200" Margin="0,0,10,0" />
           <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="0,0,8,0">
             <Button Classes="icon-button" ToolTip.Tip="Adicionar paciente" Command="{Binding ShowPatientFormCommand}"><PathIcon Data="M12,5A3,3 0 1,1 12,11A3,3 0 0,1 12,5M12,13C15.3,13 18,14.35 18,16V18H6V16C6,14.35 8.7,13 12,13M19,8V5H17V8H14V10H17V13H19V10H22V8H19Z" /></Button>
             <Button Classes="icon-button" ToolTip.Tip="Editar paciente" Command="{Binding EditPatientCommand}"><PathIcon Data="M3,17.25V21H6.75L17.81,9.94L14.06,6.19L3,17.25M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.13,5.12L18.88,8.87L20.71,7.04Z" /></Button>
