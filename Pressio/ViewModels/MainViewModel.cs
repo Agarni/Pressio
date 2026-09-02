@@ -34,7 +34,7 @@ public class MainViewModel : ViewModelBase
     public string LastReading => Measurements.FirstOrDefault()?.DisplayValue ?? "—";
     public string LastReadingDetails => Measurements.FirstOrDefault() is { } measurement ? $"{measurement.DisplayDate}  •  {DescribeMedicationTiming(measurement.MedicationTiming)}" : "Nenhuma medição registrada";
     public string WeeklySummary => Measurements.Count == 0 ? "Registre a primeira medição" : $"{Measurements.Count} medições registradas";
-    public string AverageReading => Measurements.Count == 0 ? "—" : $"{Measurements.Average(x => x.Systolic):0}/{Measurements.Average(x => x.Diastolic):0}";
+    public string AverageReading => Measurements.Count == 0 ? "—" : BloodPressureMeasurement.Format((int)Math.Round(Measurements.Average(x => x.Systolic), MidpointRounding.AwayFromZero), (int)Math.Round(Measurements.Average(x => x.Diastolic), MidpointRounding.AwayFromZero));
     public string MeasurementCount => Measurements.Count.ToString();
     private Geometry _systolicLine = new StreamGeometry();
     public Geometry SystolicLine { get => _systolicLine; private set => this.RaiseAndSetIfChanged(ref _systolicLine, value); }
@@ -534,7 +534,7 @@ public class MainViewModel : ViewModelBase
             DiastolicLine = ChartPathBuilder.BuildSmooth(diastolic);
             ChartLabels.Clear();
             for (var i = 0; i < ordered.Count; i++)
-                ChartLabels.Add(new ChartPointLabel(FormatPressure(ordered[i].Systolic, ordered[i].Diastolic), (int)Math.Clamp(X(i) - 26, 4, 442), (int)Math.Clamp(Y(ordered[i].Systolic) - 26, 4, 134)));
+                ChartLabels.Add(new ChartPointLabel(BloodPressureMeasurement.Format(ordered[i].Systolic, ordered[i].Diastolic), (int)Math.Clamp(X(i) - 26, 4, 442), (int)Math.Clamp(Y(ordered[i].Systolic) - 26, 4, 134)));
         }
 
         this.RaisePropertyChanged(nameof(LastReading));
@@ -548,15 +548,13 @@ public class MainViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(ContextCounts));
     }
 
-    private static string FormatPressure(int systolic, int diastolic) => BloodPressureMeasurement.UseShorthandFormat
-        ? $"{systolic / 10d:0.#}/{diastolic / 10d:0.#}"
-        : $"{systolic}/{diastolic}";
-
     private static string SummarizeByMedication(IReadOnlyList<BloodPressureMeasurement> items, MedicationTiming timing)
     {
         var subset = items.Where(x => x.MedicationTiming == timing).ToList();
         if (subset.Count == 0) return "—";
-        return $"{subset.Count}x  ·  média {subset.Average(x => x.Systolic):0}/{subset.Average(x => x.Diastolic):0}";
+        var systolic = (int)Math.Round(subset.Average(x => x.Systolic), MidpointRounding.AwayFromZero);
+        var diastolic = (int)Math.Round(subset.Average(x => x.Diastolic), MidpointRounding.AwayFromZero);
+        return $"{subset.Count}x  ·  média {BloodPressureMeasurement.Format(systolic, diastolic)}";
     }
 
     private static IReadOnlyList<TimeSlotInfo> BuildTimeDistribution(IReadOnlyList<BloodPressureMeasurement> items) => new[]

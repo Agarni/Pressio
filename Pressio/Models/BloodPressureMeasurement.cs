@@ -41,9 +41,11 @@ public sealed record BloodPressureMeasurement(
 {
     public static bool UseShorthandFormat { get; set; } = true;
 
-    public string DisplayValue => UseShorthandFormat
-        ? $"{Systolic / 10d:0.#}/{Diastolic / 10d:0.#}"
-        : $"{Systolic}/{Diastolic}";
+    public static string Format(int systolic, int diastolic) => UseShorthandFormat
+        ? $"{systolic / 10d:0.#}/{diastolic / 10d:0.#}"
+        : $"{systolic}/{diastolic}";
+
+    public string DisplayValue => Format(Systolic, Diastolic);
     public string DisplayDate => MeasuredAt.ToString("dd/MM/yyyy HH:mm");
     public string DisplayNotes => string.IsNullOrWhiteSpace(Notes) ? "Sem observação" : Notes;
     public bool HasContext => Context != MeasurementContext.None;
