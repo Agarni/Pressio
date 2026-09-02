@@ -46,6 +46,7 @@ public class MainViewModel : ViewModelBase
     private TimeSpan? _measurementTime = DateTime.Now.TimeOfDay;
     private string _notes = string.Empty;
     private readonly MeasurementRepository _measurementRepository = new();
+    private readonly SettingsRepository _settingsRepository = new();
     private Patient? _selectedPatient;
     private bool _isPatientFormVisible;
     private string _newPatientName = string.Empty;
@@ -57,6 +58,9 @@ public class MainViewModel : ViewModelBase
     private bool _isSettingsVisible;
     private string _selectedAppearance = "Claro";
     private string _selectedPrimaryColor = "Índigo";
+    private bool _isConfirmDialogVisible;
+    private string _confirmMessage = string.Empty;
+    private ConfirmationAction _pendingConfirmation;
 
     public bool IsMeasurementFormVisible
     {
@@ -164,13 +168,11 @@ public class MainViewModel : ViewModelBase
     public string SelectedAppearance
     {
         get => _selectedAppearance;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _selectedAppearance, value);
-            App.ApplyAppearance(value, SelectedPrimaryColor);
-        }
+        set => this.RaiseAndSetIfChanged(ref _selectedAppearance, value);
     }
     public string SelectedPrimaryColor { get => _selectedPrimaryColor; set => this.RaiseAndSetIfChanged(ref _selectedPrimaryColor, value); }
+    public bool IsConfirmDialogVisible { get => _isConfirmDialogVisible; private set => this.RaiseAndSetIfChanged(ref _isConfirmDialogVisible, value); }
+    public string ConfirmMessage { get => _confirmMessage; private set => this.RaiseAndSetIfChanged(ref _confirmMessage, value); }
 
     public ReactiveCommand<Unit, Unit> ShowMeasurementFormCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> CancelMeasurementCommand { get; private set; } = null!;
@@ -188,6 +190,8 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> SaveSettingsCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> CloseSettingsCommand { get; private set; } = null!;
     public ReactiveCommand<string, Unit> SelectPrimaryColorCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> ConfirmDeleteCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> CancelDeleteCommand { get; private set; } = null!;
 
     private void Initialize()
     {
@@ -220,16 +224,24 @@ public class MainViewModel : ViewModelBase
         EditPatientCommand = ReactiveCommand.Create(EditPatient);
         DeletePatientCommand = ReactiveCommand.Create(DeletePatient);
         ShowSettingsCommand = ReactiveCommand.Create(() => { IsSettingsVisible = true; });
-        SaveSettingsCommand = ReactiveCommand.Create(() => { App.ApplyAppearance(SelectedAppearance, SelectedPrimaryColor); IsSettingsVisible = false; });
+        SaveSettingsCommand = ReactiveCommand.Create(() => { App.ApplyAppearance(SelectedAppearance, SelectedPrimaryColor); _settingsRepository.SaveAppearance(SelectedAppearance, SelectedPrimaryColor); IsSettingsVisible = false; });
         CloseSettingsCommand = ReactiveCommand.Create(() => { IsSettingsVisible = false; });
-        SelectPrimaryColorCommand = ReactiveCommand.Create<string>(color =>
-        {
-            SelectedPrimaryColor = color;
-            App.ApplyAppearance(SelectedAppearance, color);
-        });
+        SelectPrimaryColorCommand = ReactiveCommand.Create<string>(color => SelectedPrimaryColor = color);
+        CancelDeleteCommand = ReactiveCommand.Create(() => { IsConfirmDialogVisible = false; });
+        ConfirmDeleteCommand = ReactiveCommand.Create(ExecuteConfirmedDelete);
         ExportCsvCommand = ReactiveCommand.Create(ExportCsv);
+        LoadAppSettings();
         foreach (var patient in _measurementRepository.GetPatients()) Patients.Add(patient);
         SelectedPatient = Patients.FirstOrDefault();
+    }
+
+    private void LoadAppSettings()
+    {
+        _selectedAppearance = _settingsRepository.GetAppearance();
+        _selectedPrimaryColor = _settingsRepository.GetPrimaryColor();
+        this.RaisePropertyChanged(nameof(SelectedAppearance));
+        this.RaisePropertyChanged(nameof(SelectedPrimaryColor));
+        App.ApplyAppearance(_selectedAppearance, _selectedPrimaryColor);
     }
 
     private void SaveMeasurement()
@@ -272,11 +284,10 @@ public class MainViewModel : ViewModelBase
 
     private void DeleteSelectedMeasurement()
     {
-        if (SelectedMeasurement is null || SelectedMeasurement.Id == 0) return;
-        _measurementRepository.Delete(SelectedMeasurement.Id);
-        Measurements.Remove(SelectedMeasurement);
-        SelectedMeasurement = null;
-        RefreshDashboard();
+        if (SelectedMeasurement is not { Id: > 0 } measurement) return;
+        _pendingConfirmation = ConfirmationAction.DeleteMeasurement;
+        ConfirmMessage = $"Excluir a medição de {measurement.DisplayValue} em {measurement.DisplayDate}?";
+        IsConfirmDialogVisible = true;
     }
 
     private void SavePatient()
@@ -323,10 +334,36 @@ public class MainViewModel : ViewModelBase
     private void DeletePatient()
     {
         if (SelectedPatient is null || Patients.Count <= 1) { PatientError = "Mantenha ao menos um paciente cadastrado."; return; }
-        var patient = SelectedPatient;
-        _measurementRepository.DeletePatient(patient.Id);
-        Patients.Remove(patient);
-        SelectedPatient = Patients.FirstOrDefault();
+        PatientError = string.Empty;
+        _pendingConfirmation = ConfirmationAction.DeletePatient;
+        ConfirmMessage = $"Excluir o paciente \"{SelectedPatient.Name}\" e todas as suas medições?";
+        IsConfirmDialogVisible = true;
+    }
+
+    private void ExecuteConfirmedDelete()
+    {
+        IsConfirmDialogVisible = false;
+        switch (_pendingConfirmation)
+        {
+            case ConfirmationAction.DeleteMeasurement:
+                if (SelectedMeasurement is { Id: > 0 } measurement)
+                {
+                    _measurementRepository.Delete(measurement.Id);
+                    Measurements.Remove(measurement);
+                    SelectedMeasurement = null;
+                    RefreshDashboard();
+                }
+                break;
+            case ConfirmationAction.DeletePatient:
+                if (SelectedPatient is { } patient)
+                {
+                    _measurementRepository.DeletePatient(patient.Id);
+                    Patients.Remove(patient);
+                    SelectedPatient = Patients.FirstOrDefault();
+                }
+                break;
+        }
+        _pendingConfirmation = ConfirmationAction.None;
     }
 
     private void EditSelectedMeasurement()
@@ -371,4 +408,11 @@ public class MainViewModel : ViewModelBase
         MedicationTiming.NotApplicable => "não se aplica",
         _ => "medicação não informada"
     };
+
+    private enum ConfirmationAction
+    {
+        None,
+        DeleteMeasurement,
+        DeletePatient
+    }
 }

@@ -21,6 +21,25 @@
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Template"><ControlTemplate><Border Name="PART_LayoutRoot" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"><ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" Padding="{TemplateBinding Padding}" TextElement.Foreground="{TemplateBinding Foreground}" /></Border></ControlTemplate></Setter>
         </ControlTheme>
+        <ControlTheme x:Key="PressioColorSwatch" TargetType="Button">
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Template"><ControlTemplate><Border Name="PART_LayoutRoot" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"><ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" /></Border></ControlTemplate></Setter>
+        </ControlTheme>
+        <ControlTheme x:Key="PressioIconButton" TargetType="Button">
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Template"><ControlTemplate><Border Name="PART_LayoutRoot" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"><ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" /></Border></ControlTemplate></Setter>
+        </ControlTheme>
     </Application.Resources>
     <Application.DataTemplates>
         <local:ViewLocator/>
@@ -90,29 +109,43 @@
             <Setter Property="Background" Value="#FFE1E0" />
             <Setter Property="Foreground" Value="#8D1B13" />
         </Style>
-        <Style Selector="Button.top-action-button">
-            <Setter Property="Theme" Value="{StaticResource PressioPrimaryButton}" />
-            <Setter Property="Width" Value="38" />
-            <Setter Property="Height" Value="36" />
-            <Setter Property="Padding" Value="8" />
-            <Setter Property="Background" Value="#EEF0FF" />
-            <Setter Property="Foreground" Value="#4C4CBD" />
-            <Setter Property="BorderBrush" Value="#D7D9FA" />
+        <Style Selector="Button.color-swatch">
+            <Setter Property="Theme" Value="{StaticResource PressioColorSwatch}" />
             <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource PressioBorderBrush}" />
         </Style>
-        <Style Selector="Button.top-action-button:pointerover">
-            <Setter Property="Background" Value="#DDE1FF" />
-            <Setter Property="Foreground" Value="#34349F" />
-            <Setter Property="BorderBrush" Value="#B9BEF5" />
+        <Style Selector="Button.color-swatch:pointerover">
+            <Setter Property="Opacity" Value="0.9" />
         </Style>
-        <Style Selector="Button.danger-icon-button">
+        <Style Selector="Button.color-swatch:pressed">
+            <Setter Property="Opacity" Value="0.8" />
+        </Style>
+        <Style Selector="Button.icon-button">
+            <Setter Property="Theme" Value="{StaticResource PressioIconButton}" />
+            <Setter Property="Foreground" Value="{DynamicResource PressioMutedBrush}" />
+        </Style>
+        <Style Selector="Button.icon-button:pointerover">
+            <Setter Property="Background" Value="{DynamicResource PressioBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource PressioPrimaryBrush}" />
+        </Style>
+        <Style Selector="Button.icon-button:pressed">
+            <Setter Property="Background" Value="{DynamicResource PressioPrimaryBrush}" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.icon-button.danger:pointerover">
             <Setter Property="Background" Value="#FFF0F0" />
             <Setter Property="Foreground" Value="#B42318" />
-            <Setter Property="BorderBrush" Value="#F5C9C7" />
         </Style>
-        <Style Selector="Button.danger-icon-button:pointerover">
-            <Setter Property="Background" Value="#FFE1E0" />
+        <Style Selector="Button.icon-button.danger:pressed">
+            <Setter Property="Background" Value="#F5C9C7" />
             <Setter Property="Foreground" Value="#8D1B13" />
+        </Style>
+        <Style Selector="ListBoxItem">
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="12,8" />
+        </Style>
+        <Style Selector="ListBoxItem:selected">
+            <Setter Property="Background" Value="#3D5B5BD6" />
         </Style>
     </Application.Styles>
 </Application>

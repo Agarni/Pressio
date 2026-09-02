@@ -37,7 +37,11 @@ The Avalonia packages (Avalonia, Themes.Fluent, Fonts.Inter, Desktop, iOS, Brows
 
 - SQLite via raw `Microsoft.Data.Sqlite` (no EF Core/Dapper, despite what `PRD.md` suggests).
 - DB file: `%LocalAppData%\Pressio\pressio.db`. Dates are stored as ISO-8601 strings; UTC on write, `.ToLocalTime()` on read.
-- Schema is created in `MeasurementRepository.Initialize()` with `CREATE TABLE IF NOT EXISTS` plus a hand-rolled migration that checks `PRAGMA table_info` before `ALTER TABLE`. If you add a column, follow this same pattern.
+- Both `MeasurementRepository` and `SettingsRepository` open the same DB file, each computing its own connection string.
+- `MeasurementRepository.Initialize()` creates tables with `CREATE TABLE IF NOT EXISTS` plus a hand-rolled migration that checks `PRAGMA table_info` before `ALTER TABLE`. If you add a column, follow this same pattern.
+- `SettingsRepository` stores a simple key/value `Settings (Key TEXT PRIMARY KEY, Value TEXT)` table (used for theme + primary color via `SaveAppearance`). Appearance/primary color are loaded in `MainViewModel.LoadAppSettings()`, applied via `App.ApplyAppearance`, and applied+persisted **only** on confirming the Settings dialog (`SaveSettingsCommand`). Selecting a theme or a color swatch does NOT change the app before that (no live global preview); the selected color is indicated by a check inside the swatch via the `ColorMatchConverter`.
+- Reusable looks live in `App.axaml`: button style classes (`primary-button`, `secondary-button`, `danger-button`, `icon-button`, `color-swatch`) plus `ControlTheme`s like `PressioPrimaryButton`/`PressioColorSwatch`/`PressioIconButton`. Dialogs and cards should use the `Pressio*` `DynamicResource` brushes (surface/text/muted/primary/border/banner) so they adapt to light/dark — avoid hardcoded hex for surfaces/text.
+- Deletes of patients and measurements are gated behind a confirmation overlay driven by `MainViewModel` (`ConfirmDeleteCommand`/`CancelDeleteCommand`, `IsConfirmDialogVisible`).
 
 ## Blood pressure parsing (`BloodPressureParser`)
 
@@ -48,4 +52,4 @@ The Avalonia packages (Avalonia, Themes.Fluent, Fonts.Inter, Desktop, iOS, Brows
 - ReactiveUI MVVM. Compiled bindings are on by default (`AvaloniaUseCompiledBindingsByDefault=true`), so `x:DataType` / strong-typed bindings are expected in XAML.
 - Views are located from viewmodels by naming convention in `ViewLocator.cs` (a `FooViewModel` resolves to a `FooView`).
 - `MainViewModel` is constructed with `isMobileLayout`; desktop shows forms as centered **modal dialogs**, mobile/tablet (<11") shows them as **full-screen pages**. Platform hosts wire this up in `App.OnFrameworkInitializationCompleted()`.
-- Theming/resources live in `App.axaml` (brush keys like `PressioPrimaryBrush`, button style classes `primary-button`, `secondary-button`, `danger-button`, `top-action-button`, `danger-icon-button`) and are toggled at runtime by `App.ApplyAppearance(appearance, primaryColor)` in `App.axaml.cs`. Reuse these instead of hardcoding colors in views.
+- Theming/resources live in `App.axaml` (brush keys like `PressioPrimaryBrush`) and are toggled at runtime by `App.ApplyAppearance(appearance, primaryColor)` in `App.axaml.cs`. Reuse the `Pressio*` brushes and button classes instead of hardcoding colors in views. View-level converters live in `Pressio/Converters/` (e.g. `ColorMatchConverter`).

@@ -25,10 +25,13 @@ O MVP está em andamento. Abaixo, o mapa do que já existe e o cronograma de con
 - [x] Exportação em CSV (sem filtros).
 - [x] Tema claro/escuro e escolha de cor primária (Índigo, Azul, Verde, Roxo, Coral).
 - [x] Layout responsivo: formulários em diálogo modal no desktop e tela cheia em celulares.
+- [x] Persistência de aparência e cor primária (aplicadas somente ao confirmar em "Aplicar").
+- [x] Confirmação de exclusão de pacientes e medições (diálogo de confirmação).
+- [x] Tema escuro aplicado às superfícies, cartões e diálogos (via `DynamicResource`).
 
 ### Roadmap
 
-- [ ] **Fase 1 — Consistência/fundação:** separador de espaço no parser; persistir aparência e cor primária; confirmação de exclusão; refatorar formulários em Views/ViewModels separadas via `ViewLocator`.
+- [ ] **Fase 1 — Consistência/fundação:** falta separador de espaço no parser e refatorar os formulários em Views/ViewModels separadas via `ViewLocator`. (`persistir aparência/cor primária` e `confirmação de exclusão` já concluídos.)
 - [ ] **Fase 2 — Contexto da aferição (4.3):** entidade e tabela de fatores contextuais, seleção por chips no formulário e exibição no histórico.
 - [ ] **Fase 3 — Histórico e filtros (4.4):** filtro por período, horário e medicação; busca em observações; refletindo no dashboard.
 - [ ] **Fase 4 — Dashboard completo (4.5):** seletor de período, comparação antes/depois, distribuição por horário, calendário, gráfico de sistólica e diastólica.
