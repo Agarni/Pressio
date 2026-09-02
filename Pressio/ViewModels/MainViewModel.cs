@@ -51,6 +51,10 @@ public class MainViewModel : ViewModelBase
     private DateTime? _measurementDate = DateTime.Today;
     private TimeSpan? _measurementTime = DateTime.Now.TimeOfDay;
     private string _notes = string.Empty;
+    private string _heartRateInput = string.Empty;
+    private bool _atRest;
+    private string _selectedArm = "Não informado";
+    private string _selectedPosition = "Não informado";
     private readonly MeasurementRepository _measurementRepository = new();
     private readonly SettingsRepository _settingsRepository = new();
     private Patient? _selectedPatient;
@@ -64,6 +68,7 @@ public class MainViewModel : ViewModelBase
     private bool _isSettingsVisible;
     private string _selectedAppearance = "Claro";
     private string _selectedPrimaryColor = "Índigo";
+    private string _selectedDisplayFormat = "13/8";
     private bool _isConfirmDialogVisible;
     private string _confirmMessage = string.Empty;
     private ConfirmationAction _pendingConfirmation;
@@ -135,6 +140,14 @@ public class MainViewModel : ViewModelBase
     public DateTime? MeasurementDate { get => _measurementDate; set => this.RaiseAndSetIfChanged(ref _measurementDate, value); }
     public TimeSpan? MeasurementTime { get => _measurementTime; set => this.RaiseAndSetIfChanged(ref _measurementTime, value); }
     public string Notes { get => _notes; set => this.RaiseAndSetIfChanged(ref _notes, value); }
+    public string HeartRateInput { get => _heartRateInput; set { this.RaiseAndSetIfChanged(ref _heartRateInput, value); MeasurementError = string.Empty; } }
+    public bool AtRest { get => _atRest; set => this.RaiseAndSetIfChanged(ref _atRest, value); }
+    public IReadOnlyList<string> ArmOptions { get; } = new[] { "Não informado", "Direito", "Esquerdo" };
+    public IReadOnlyList<string> PositionOptions { get; } = new[] { "Não informado", "Sentado", "Deitado", "Em pé" };
+    public string SelectedArm { get => _selectedArm; set => this.RaiseAndSetIfChanged(ref _selectedArm, value); }
+    public string SelectedPosition { get => _selectedPosition; set => this.RaiseAndSetIfChanged(ref _selectedPosition, value); }
+    public IReadOnlyList<string> MeasurementDisplayFormatOptions { get; } = new[] { "13/8", "130/80" };
+    public string SelectedDisplayFormat { get => _selectedDisplayFormat; set => this.RaiseAndSetIfChanged(ref _selectedDisplayFormat, value); }
     public ObservableCollection<BloodPressureMeasurement> Measurements { get; } = new();
     public ObservableCollection<Patient> Patients { get; } = new();
     public ObservableCollection<ContextOption> ContextOptions { get; } = new();
@@ -239,6 +252,10 @@ public class MainViewModel : ViewModelBase
             MeasurementDate = DateTime.Today;
             MeasurementTime = DateTime.Now.TimeOfDay;
             MedicationTiming = MedicationTiming.NotInformed;
+            HeartRateInput = string.Empty;
+            AtRest = false;
+            SelectedArm = "Não informado";
+            SelectedPosition = "Não informado";
             SetContext(MeasurementContext.None);
             this.RaisePropertyChanged(nameof(SelectedMedicationOption));
             this.RaisePropertyChanged(nameof(MeasurementFormTitle));
@@ -261,7 +278,15 @@ public class MainViewModel : ViewModelBase
         EditPatientCommand = ReactiveCommand.Create(EditPatient);
         DeletePatientCommand = ReactiveCommand.Create(DeletePatient);
         ShowSettingsCommand = ReactiveCommand.Create(() => { IsSettingsVisible = true; });
-        SaveSettingsCommand = ReactiveCommand.Create(() => { App.ApplyAppearance(SelectedAppearance, SelectedPrimaryColor); _settingsRepository.SaveAppearance(SelectedAppearance, SelectedPrimaryColor); IsSettingsVisible = false; });
+        SaveSettingsCommand = ReactiveCommand.Create(() =>
+        {
+            App.ApplyAppearance(SelectedAppearance, SelectedPrimaryColor);
+            _settingsRepository.SaveAppearance(SelectedAppearance, SelectedPrimaryColor);
+            BloodPressureMeasurement.UseShorthandFormat = SelectedDisplayFormat != "130/80";
+            _settingsRepository.SaveMeasurementDisplayFormat(SelectedDisplayFormat);
+            IsSettingsVisible = false;
+            ReloadMeasurements();
+        });
         CloseSettingsCommand = ReactiveCommand.Create(() => { IsSettingsVisible = false; });
         SelectPrimaryColorCommand = ReactiveCommand.Create<string>(color => SelectedPrimaryColor = color);
         CancelDeleteCommand = ReactiveCommand.Create(() => { IsConfirmDialogVisible = false; });
@@ -284,8 +309,11 @@ public class MainViewModel : ViewModelBase
     {
         _selectedAppearance = _settingsRepository.GetAppearance();
         _selectedPrimaryColor = _settingsRepository.GetPrimaryColor();
+        _selectedDisplayFormat = _settingsRepository.GetMeasurementDisplayFormat();
+        BloodPressureMeasurement.UseShorthandFormat = _selectedDisplayFormat != "130/80";
         this.RaisePropertyChanged(nameof(SelectedAppearance));
         this.RaisePropertyChanged(nameof(SelectedPrimaryColor));
+        this.RaisePropertyChanged(nameof(SelectedDisplayFormat));
         App.ApplyAppearance(_selectedAppearance, _selectedPrimaryColor);
     }
 
@@ -300,8 +328,15 @@ public class MainViewModel : ViewModelBase
         // Persistência será adicionada na próxima etapa; por enquanto o fluxo já valida
         // e confirma a medição para preparar a integração com o histórico.
         var measuredAt = (MeasurementDate ?? DateTime.Today).Date.Add(MeasurementTime ?? DateTime.Now.TimeOfDay);
+        int? heartRate = null;
+        var hrText = HeartRateInput?.Trim();
+        if (!string.IsNullOrEmpty(hrText))
+        {
+            if (!int.TryParse(hrText, out var hr) || hr is < 20 or > 300) { MeasurementError = "Frequência cardíaca inválida (20 a 300)."; return; }
+            heartRate = hr;
+        }
         var context = SelectedContext();
-        var measurement = new BloodPressureMeasurement(parsed!.Systolic, parsed.Diastolic, measuredAt, MedicationTiming, string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim(), context);
+        var measurement = new BloodPressureMeasurement(parsed!.Systolic, parsed.Diastolic, measuredAt, MedicationTiming, string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim(), context, heartRate, AtRest, ParseArm(), ParsePosition());
         if (_editingMeasurement && SelectedMeasurement is { Id: > 0 } existing)
         {
             measurement = measurement with { Id = existing.Id };
@@ -417,6 +452,10 @@ public class MainViewModel : ViewModelBase
         MeasurementTime = measurement.MeasuredAt.TimeOfDay;
         MedicationTiming = measurement.MedicationTiming;
         Notes = measurement.Notes ?? string.Empty;
+        HeartRateInput = measurement.HeartRate?.ToString() ?? string.Empty;
+        AtRest = measurement.AtRest;
+        SelectedArm = measurement.Arm switch { Arm.Right => "Direito", Arm.Left => "Esquerdo", _ => "Não informado" };
+        SelectedPosition = measurement.Position switch { BodyPosition.Seated => "Sentado", BodyPosition.Lying => "Deitado", BodyPosition.Standing => "Em pé", _ => "Não informado" };
         SetContext(measurement.Context);
         IsMeasurementFormVisible = true;
         this.RaisePropertyChanged(nameof(MeasurementFormTitle));
@@ -531,6 +570,21 @@ public class MainViewModel : ViewModelBase
         foreach (var option in ContextOptions)
             option.IsSelected = (context & option.Context) != 0;
     }
+
+    private Arm ParseArm() => SelectedArm switch
+    {
+        "Direito" => Arm.Right,
+        "Esquerdo" => Arm.Left,
+        _ => Arm.NotInformed
+    };
+
+    private BodyPosition ParsePosition() => SelectedPosition switch
+    {
+        "Sentado" => BodyPosition.Seated,
+        "Deitado" => BodyPosition.Lying,
+        "Em pé" => BodyPosition.Standing,
+        _ => BodyPosition.NotInformed
+    };
 
     private static string DescribeMedicationTiming(MedicationTiming timing) => timing switch
     {
