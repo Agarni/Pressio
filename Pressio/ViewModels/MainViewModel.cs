@@ -71,6 +71,7 @@ public class MainViewModel : ViewModelBase
     private BloodPressureMeasurement? _selectedMeasurement;
     private bool _editingMeasurement;
     private bool _isSettingsVisible;
+    private bool _isAboutVisible;
     private string _selectedAppearance = "Claro";
     private string _selectedPrimaryColor = "Índigo";
     private string _selectedDisplayFormat = "13/8";
@@ -207,6 +208,9 @@ public class MainViewModel : ViewModelBase
             this.RaisePropertyChanged(nameof(IsSettingsMobilePageVisible));
         }
     }
+    public bool IsAboutVisible { get => _isAboutVisible; private set { this.RaiseAndSetIfChanged(ref _isAboutVisible, value); this.RaisePropertyChanged(nameof(IsAboutDialogVisible)); this.RaisePropertyChanged(nameof(IsAboutMobilePageVisible)); } }
+    public bool IsAboutDialogVisible => IsAboutVisible && !IsMobileLayout;
+    public bool IsAboutMobilePageVisible => IsAboutVisible && IsMobileLayout;
     public IReadOnlyList<string> AppearanceOptions { get; } = new[] { "Claro", "Escuro" };
     public IReadOnlyList<string> PrimaryColorOptions { get; } = new[] { "Índigo", "Azul", "Verde", "Roxo", "Coral" };
     public string SelectedAppearance
@@ -288,6 +292,8 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> SaveSettingsCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> CloseSettingsCommand { get; private set; } = null!;
     public ReactiveCommand<string, Unit> SelectPrimaryColorCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> ShowAboutCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> CloseAboutCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ConfirmDeleteCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> CancelDeleteCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ShowRemindersCommand { get; private set; } = null!;
@@ -347,6 +353,8 @@ public class MainViewModel : ViewModelBase
         });
         CloseSettingsCommand = ReactiveCommand.Create(() => { IsSettingsVisible = false; });
         SelectPrimaryColorCommand = ReactiveCommand.Create<string>(color => SelectedPrimaryColor = color);
+        ShowAboutCommand = ReactiveCommand.Create(() => { IsAboutVisible = true; });
+        CloseAboutCommand = ReactiveCommand.Create(() => { IsAboutVisible = false; });
         CancelDeleteCommand = ReactiveCommand.Create(() => { IsConfirmDialogVisible = false; });
         ConfirmDeleteCommand = ReactiveCommand.Create(ExecuteConfirmedDelete);
         ClearFiltersCommand = ReactiveCommand.Create(() =>
@@ -375,6 +383,8 @@ public class MainViewModel : ViewModelBase
         foreach (var day in ReminderInfo.AllDays) ReminderDayOptions.Add(new ReminderDayOption(day.Value, day.Label));
         try { Observable.Interval(TimeSpan.FromSeconds(20), RxApp.MainThreadScheduler).Subscribe(_ => CheckDueReminders()); } catch { }
         RescheduleEnabledReminders();
+        IsAboutVisible = true;
+        Observable.Timer(TimeSpan.FromMilliseconds(1800), RxApp.MainThreadScheduler).Subscribe(_ => { IsAboutVisible = false; });
         ExportCsvCommand = ReactiveCommand.CreateFromTask(ExportCsv);
         ExportPdfCommand = ReactiveCommand.CreateFromTask(ExportPdf);
         foreach (var option in MeasurementContextInfo.AllContexts) ContextOptions.Add(new ContextOption(option.Value, option.Label));

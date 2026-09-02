@@ -10,6 +10,11 @@ namespace Pressio;
 
 public partial class App : Application
 {
+    public App()
+    {
+        Name = "Pressio";
+    }
+
     public static void ApplyAppearance(string appearance, string primaryColor)
     {
         if (Current is not App app) return;

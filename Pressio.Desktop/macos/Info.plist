@@ -18,6 +18,8 @@
 	<string>Pressio.Desktop</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>© 2026 Sérgio Luiz</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>LSMinimumSystemVersion</key>
