@@ -1,0 +1,11 @@
+﻿<Solution>
+  <Project Path="Pressio.Android/Pressio.Android.csproj">
+    <Deploy />
+  </Project>
+  <Project Path="Pressio.Browser/Pressio.Browser.csproj" />
+  <Project Path="Pressio.Desktop/Pressio.Desktop.csproj" />
+  <Project Path="Pressio.iOS/Pressio.iOS.csproj">
+    <Deploy />
+  </Project>
+  <Project Path="Pressio/Pressio.csproj" />
+</Solution>
