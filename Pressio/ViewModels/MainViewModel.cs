@@ -82,6 +82,8 @@ public class MainViewModel : ViewModelBase
     private string _filterTimeOfDay = "Todos os horários";
     private string _filterSearch = string.Empty;
     private string _reportPeriod = "Todo o histórico";
+    private DateTime? _reportStartDate = DateTime.Today.AddDays(-30);
+    private DateTime? _reportEndDate = DateTime.Today;
 
     public bool IsMeasurementFormVisible
     {
@@ -226,8 +228,15 @@ public class MainViewModel : ViewModelBase
         get => _filterSearch;
         set { if (_filterSearch != value) { _filterSearch = value; this.RaisePropertyChanged(nameof(FilterSearch)); ApplyFilters(); } }
     }
-    public IReadOnlyList<string> ReportPeriodOptions { get; } = new[] { "Todo o histórico", "Últimos 7 dias", "Últimos 30 dias" };
-    public string ReportPeriod { get => _reportPeriod; set => this.RaiseAndSetIfChanged(ref _reportPeriod, value); }
+    public IReadOnlyList<string> ReportPeriodOptions { get; } = new[] { "Todo o histórico", "Últimos 7 dias", "Últimos 30 dias", "Período personalizado" };
+    public string ReportPeriod
+    {
+        get => _reportPeriod;
+        set { if (_reportPeriod != value) { _reportPeriod = value; this.RaisePropertyChanged(nameof(ReportPeriod)); this.RaisePropertyChanged(nameof(IsCustomReportPeriod)); } }
+    }
+    public bool IsCustomReportPeriod => ReportPeriod == "Período personalizado";
+    public DateTime? ReportStartDate { get => _reportStartDate; set => this.RaiseAndSetIfChanged(ref _reportStartDate, value); }
+    public DateTime? ReportEndDate { get => _reportEndDate; set => this.RaiseAndSetIfChanged(ref _reportEndDate, value); }
 
     public ReactiveCommand<Unit, Unit> ShowMeasurementFormCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> CancelMeasurementCommand { get; private set; } = null!;
@@ -426,10 +435,20 @@ public class MainViewModel : ViewModelBase
     private (List<BloodPressureMeasurement> Items, bool Truncated) BuildReportSet()
     {
         IEnumerable<BloodPressureMeasurement> query = Measurements;
-        if (ReportPeriod != "Todo o histórico")
+        switch (ReportPeriod)
         {
-            var from = ReportPeriod == "Últimos 7 dias" ? DateTime.Today.AddDays(-6) : DateTime.Today.AddDays(-29);
-            query = query.Where(m => m.MeasuredAt.Date >= from);
+            case "Últimos 7 dias":
+                var from7 = DateTime.Today.AddDays(-6);
+                query = query.Where(m => m.MeasuredAt.Date >= from7);
+                break;
+            case "Últimos 30 dias":
+                var from30 = DateTime.Today.AddDays(-29);
+                query = query.Where(m => m.MeasuredAt.Date >= from30);
+                break;
+            case "Período personalizado":
+                if (ReportStartDate is { } start) query = query.Where(m => m.MeasuredAt.Date >= start.Date);
+                if (ReportEndDate is { } end) query = query.Where(m => m.MeasuredAt.Date <= end.Date);
+                break;
         }
         var list = query.OrderByDescending(m => m.MeasuredAt).ToList();
         var truncated = list.Count > 30;
@@ -439,8 +458,10 @@ public class MainViewModel : ViewModelBase
 
     private string ReportDescription()
     {
-        var parts = new[] { FilterDescription(), $"Período do relatório: {ReportPeriod}" };
-        return string.Join("   •   ", parts);
+        var period = ReportPeriod == "Período personalizado"
+            ? $"{ReportStartDate?.ToString("dd/MM/yyyy") ?? "?"} a {ReportEndDate?.ToString("dd/MM/yyyy") ?? "?"}"
+            : ReportPeriod;
+        return string.Join("   •   ", new[] { FilterDescription(), $"Período do relatório: {period}" });
     }
 
     private async Task<string?> RequestExportPath(string extension, string kind)

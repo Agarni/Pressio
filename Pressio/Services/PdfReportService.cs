@@ -45,10 +45,10 @@ public static class PdfReportService
         // header + icon
         DrawAppIcon(canvas);
         canvas.DrawText("Pressio — Relatório de pressão", Margin + 58, y, titleFont, primary); y += 26;
-        canvas.DrawText($"Paciente: {patient.Name}", Margin, y, labelFont, text); y += 18;
+        canvas.DrawText($"Paciente: {patient.Name}", Margin + 58, y, labelFont, text); y += 18;
         var note = $"Gerado em: {DateTime.Now:dd/MM/yyyy HH:mm}   •   {description}";
         if (truncated) note += "   •   exibindo os últimos 30 registros";
-        canvas.DrawText(note, Margin, y, smallFont, muted); y += 16;
+        canvas.DrawText(note, Margin + 58, y, smallFont, muted); y += 16;
         canvas.DrawLine(Margin, y, PageW - Margin, y, line); y += 24;
 
         // Registros (first)
@@ -106,7 +106,7 @@ public static class PdfReportService
         {
             using var stream = typeof(PdfReportService).Assembly.GetManifestResourceStream("Pressio.Assets.Icon.png");
             using var bitmap = SKBitmap.Decode(stream);
-            if (bitmap != null) canvas.DrawBitmap(bitmap, new SKRect(Margin, Margin - 8, Margin + 46, Margin + 38));
+            if (bitmap != null) canvas.DrawBitmap(bitmap, new SKRect(Margin, Margin - 6, Margin + 42, Margin + 36));
         }
         catch
         {
