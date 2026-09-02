@@ -6,6 +6,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.IO;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Media;
@@ -249,6 +250,7 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> ExportCsvCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ExportPdfCommand { get; private set; } = null!;
     public Interaction<ExportFileRequest, string?> ExportFileInteraction { get; } = new();
+    public Interaction<string, bool> ConfirmOpenInteraction { get; } = new();
     public ReactiveCommand<Unit, Unit> CancelPatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> EditPatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> DeletePatientCommand { get; private set; } = null!;
@@ -427,9 +429,17 @@ public class MainViewModel : ViewModelBase
         var (report, truncated) = BuildReportSet();
         var path = await RequestExportPath("pdf", "PDF");
         if (path is null) { ExportStatus = "Exportação cancelada."; return; }
-        PdfReportService.Export(path, SelectedPatient, report, ReportDescription(), truncated);
+        PdfReportService.Export(path, SelectedPatient, report, ReportDescription(report), truncated);
         SaveExportDirectory(path);
         ExportStatus = $"Relatório PDF salvo em: {path}{(truncated ? " (últimos 30 registros)" : "")}";
+        var open = await ConfirmOpenInteraction.Handle("O relatório PDF foi gerado. Deseja abri-lo com o aplicativo padrão?").FirstAsync();
+        if (open) TryOpenFile(path);
+    }
+
+    private void TryOpenFile(string path)
+    {
+        try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
+        catch { ExportStatus = "Não foi possível abrir o arquivo automaticamente."; }
     }
 
     private (List<BloodPressureMeasurement> Items, bool Truncated) BuildReportSet()
@@ -456,12 +466,16 @@ public class MainViewModel : ViewModelBase
         return (list.OrderBy(m => m.MeasuredAt).ToList(), truncated);
     }
 
-    private string ReportDescription()
+    private string ReportDescription(IReadOnlyList<BloodPressureMeasurement> report)
     {
-        var period = ReportPeriod == "Período personalizado"
-            ? $"{ReportStartDate?.ToString("dd/MM/yyyy") ?? "?"} a {ReportEndDate?.ToString("dd/MM/yyyy") ?? "?"}"
-            : ReportPeriod;
-        return string.Join("   •   ", new[] { FilterDescription(), $"Período do relatório: {period}" });
+        var range = ReportPeriod switch
+        {
+            "Últimos 7 dias" => $"{DateTime.Today.AddDays(-6):dd/MM/yyyy} a {DateTime.Today:dd/MM/yyyy}",
+            "Últimos 30 dias" => $"{DateTime.Today.AddDays(-29):dd/MM/yyyy} a {DateTime.Today:dd/MM/yyyy}",
+            "Período personalizado" => $"{ReportStartDate?.ToString("dd/MM/yyyy") ?? "?"} a {ReportEndDate?.ToString("dd/MM/yyyy") ?? "?"}",
+            _ => report.Count > 0 ? $"{report[0].MeasuredAt:dd/MM/yyyy} a {report[^1].MeasuredAt:dd/MM/yyyy}" : "—"
+        };
+        return $"Período do relatório: {range}";
     }
 
     private async Task<string?> RequestExportPath(string extension, string kind)
@@ -475,14 +489,6 @@ public class MainViewModel : ViewModelBase
         var directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrWhiteSpace(directory)) _settingsRepository.SaveLastExportDirectory(directory);
     }
-
-    private string FilterDescription() => string.Join(" · ", new[]
-    {
-        FilterPeriod,
-        FilterMedication,
-        FilterTimeOfDay,
-        string.IsNullOrWhiteSpace(FilterSearch) ? null : $"busca: \"{FilterSearch.Trim()}\""
-    }.Where(x => x is not null));
 
     private void EditPatient()
     {
