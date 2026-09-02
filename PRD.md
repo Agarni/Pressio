@@ -30,11 +30,13 @@ O MVP está em andamento. Abaixo, o mapa do que já existe e o cronograma de con
 - [x] Tema escuro aplicado às superfícies, cartões e diálogos (via `DynamicResource`).
 - [x] Separador de espaço no parser de pressão (além de `/` e `x`).
 - [x] Fatores contextuais da aferição: seleção por chips e exibição no histórico.
+- [x] Histórico com filtros (período, horário, medicação) e busca em observações, refletindo no dashboard.
 
 ### Roadmap
 
 - [ ] **Fase 1 — Consistência/fundação:** falta refatorar os formulários em Views/ViewModels separadas via `ViewLocator`. (`separador de espaço no parser`, `persistir aparência/cor primária` e `confirmação de exclusão` já concluídos.)
 - [x] **Fase 2 — Contexto da aferição (4.3):** entidade e coluna de fatores contextuais, seleção por chips no formulário e exibição no histórico.
+- [x] **Fase 3 — Histórico e filtros (4.4):** filtro por período, horário e medicação; busca em observações; refletindo no dashboard.
 - [ ] **Fase 3 — Histórico e filtros (4.4):** filtro por período, horário e medicação; busca em observações; refletindo no dashboard.
 - [ ] **Fase 4 — Dashboard completo (4.5):** seletor de período, comparação antes/depois, distribuição por horário, calendário, gráfico de sistólica e diastólica.
 - [ ] **Fase 5 — Formulário ampliado (4.2):** frequência cardíaca, repouso, braço/posição, formato de exibição configurável.

@@ -61,6 +61,11 @@ public class MainViewModel : ViewModelBase
     private bool _isConfirmDialogVisible;
     private string _confirmMessage = string.Empty;
     private ConfirmationAction _pendingConfirmation;
+    private List<BloodPressureMeasurement> _sourceMeasurements = new();
+    private string _filterPeriod = "Todo o histórico";
+    private string _filterMedication = "Todas";
+    private string _filterTimeOfDay = "Todos os horários";
+    private string _filterSearch = string.Empty;
 
     public bool IsMeasurementFormVisible
     {
@@ -174,6 +179,29 @@ public class MainViewModel : ViewModelBase
     public string SelectedPrimaryColor { get => _selectedPrimaryColor; set => this.RaiseAndSetIfChanged(ref _selectedPrimaryColor, value); }
     public bool IsConfirmDialogVisible { get => _isConfirmDialogVisible; private set => this.RaiseAndSetIfChanged(ref _isConfirmDialogVisible, value); }
     public string ConfirmMessage { get => _confirmMessage; private set => this.RaiseAndSetIfChanged(ref _confirmMessage, value); }
+    public IReadOnlyList<string> FilterPeriodOptions { get; } = new[] { "Todo o histórico", "Hoje", "Últimos 7 dias", "Últimos 30 dias" };
+    public IReadOnlyList<string> FilterMedicationOptions { get; } = new[] { "Todas", "Antes da medicação", "Depois da medicação", "Não informado", "Não se aplica" };
+    public IReadOnlyList<string> FilterTimeOfDayOptions { get; } = new[] { "Todos os horários", "Madrugada", "Manhã", "Tarde", "Noite" };
+    public string FilterPeriod
+    {
+        get => _filterPeriod;
+        set { if (_filterPeriod != value) { _filterPeriod = value; this.RaisePropertyChanged(nameof(FilterPeriod)); ApplyFilters(); } }
+    }
+    public string FilterMedication
+    {
+        get => _filterMedication;
+        set { if (_filterMedication != value) { _filterMedication = value; this.RaisePropertyChanged(nameof(FilterMedication)); ApplyFilters(); } }
+    }
+    public string FilterTimeOfDay
+    {
+        get => _filterTimeOfDay;
+        set { if (_filterTimeOfDay != value) { _filterTimeOfDay = value; this.RaisePropertyChanged(nameof(FilterTimeOfDay)); ApplyFilters(); } }
+    }
+    public string FilterSearch
+    {
+        get => _filterSearch;
+        set { if (_filterSearch != value) { _filterSearch = value; this.RaisePropertyChanged(nameof(FilterSearch)); ApplyFilters(); } }
+    }
 
     public ReactiveCommand<Unit, Unit> ShowMeasurementFormCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> CancelMeasurementCommand { get; private set; } = null!;
@@ -193,6 +221,7 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<string, Unit> SelectPrimaryColorCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ConfirmDeleteCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> CancelDeleteCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> ClearFiltersCommand { get; private set; } = null!;
 
     private void Initialize()
     {
@@ -231,6 +260,13 @@ public class MainViewModel : ViewModelBase
         SelectPrimaryColorCommand = ReactiveCommand.Create<string>(color => SelectedPrimaryColor = color);
         CancelDeleteCommand = ReactiveCommand.Create(() => { IsConfirmDialogVisible = false; });
         ConfirmDeleteCommand = ReactiveCommand.Create(ExecuteConfirmedDelete);
+        ClearFiltersCommand = ReactiveCommand.Create(() =>
+        {
+            FilterPeriod = "Todo o histórico";
+            FilterMedication = "Todas";
+            FilterTimeOfDay = "Todos os horários";
+            FilterSearch = string.Empty;
+        });
         ExportCsvCommand = ReactiveCommand.Create(ExportCsv);
         foreach (var option in MeasurementContextInfo.AllContexts) ContextOptions.Add(new ContextOption(option.Value, option.Label));
         LoadAppSettings();
@@ -264,15 +300,12 @@ public class MainViewModel : ViewModelBase
         {
             measurement = measurement with { Id = existing.Id };
             _measurementRepository.Update(measurement);
-            var index = Measurements.IndexOf(existing);
-            Measurements[index] = measurement;
         }
         else
         {
             if (SelectedPatient is null) { MeasurementError = "Cadastre ou selecione um paciente antes de salvar."; return; }
             var id = _measurementRepository.Add(measurement, SelectedPatient.Id);
             measurement = measurement with { Id = id };
-            Measurements.Insert(0, measurement);
         }
         IsMeasurementFormVisible = false;
         BloodPressureInput = measurement.Systolic / 10d + "/" + measurement.Diastolic / 10d;
@@ -283,7 +316,7 @@ public class MainViewModel : ViewModelBase
         SelectedMeasurement = null;
         _editingMeasurement = false;
         this.RaisePropertyChanged(nameof(MeasurementFormTitle));
-        RefreshDashboard();
+        ReloadMeasurements();
     }
 
     private void DeleteSelectedMeasurement()
@@ -353,9 +386,8 @@ public class MainViewModel : ViewModelBase
                 if (SelectedMeasurement is { Id: > 0 } measurement)
                 {
                     _measurementRepository.Delete(measurement.Id);
-                    Measurements.Remove(measurement);
                     SelectedMeasurement = null;
-                    RefreshDashboard();
+                    ReloadMeasurements();
                 }
                 break;
             case ConfirmationAction.DeletePatient:
@@ -386,9 +418,47 @@ public class MainViewModel : ViewModelBase
 
     private void ReloadMeasurements()
     {
+        _sourceMeasurements = SelectedPatient is not null ? _measurementRepository.GetRecent(SelectedPatient.Id).ToList() : new();
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        IEnumerable<BloodPressureMeasurement> query = _sourceMeasurements;
+
+        (DateTime Start, DateTime End)? range = FilterPeriod switch
+        {
+            "Hoje" => (DateTime.Today, DateTime.Today),
+            "Últimos 7 dias" => (DateTime.Today.AddDays(-6), DateTime.Today),
+            "Últimos 30 dias" => (DateTime.Today.AddDays(-29), DateTime.Today),
+            _ => null
+        };
+        if (range is { } active) query = query.Where(m => m.MeasuredAt.Date >= active.Start && m.MeasuredAt.Date <= active.End);
+
+        query = FilterMedication switch
+        {
+            "Antes da medicação" => query.Where(m => m.MedicationTiming == MedicationTiming.BeforeMedication),
+            "Depois da medicação" => query.Where(m => m.MedicationTiming == MedicationTiming.AfterMedication),
+            "Não informado" => query.Where(m => m.MedicationTiming == MedicationTiming.NotInformed),
+            "Não se aplica" => query.Where(m => m.MedicationTiming == MedicationTiming.NotApplicable),
+            _ => query
+        };
+
+        query = FilterTimeOfDay switch
+        {
+            "Madrugada" => query.Where(m => m.MeasuredAt.Hour < 6),
+            "Manhã" => query.Where(m => m.MeasuredAt.Hour >= 6 && m.MeasuredAt.Hour < 12),
+            "Tarde" => query.Where(m => m.MeasuredAt.Hour >= 12 && m.MeasuredAt.Hour < 18),
+            "Noite" => query.Where(m => m.MeasuredAt.Hour >= 18),
+            _ => query
+        };
+
+        var search = FilterSearch?.Trim();
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(m => m.Notes?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false);
+
         Measurements.Clear();
-        if (SelectedPatient is not null)
-            foreach (var measurement in _measurementRepository.GetRecent(SelectedPatient.Id)) Measurements.Add(measurement);
+        foreach (var measurement in query) Measurements.Add(measurement);
         RefreshDashboard();
     }
 
