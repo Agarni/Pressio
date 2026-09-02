@@ -20,5 +20,6 @@
     </PackageReference>
     <PackageReference Include="ReactiveUI.Avalonia" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="SkiaSharp" />
   </ItemGroup>
 </Project>

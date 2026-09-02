@@ -16,6 +16,7 @@
         <PackageVersion Include="Avalonia.Android" Version="12.0.5" />
         <PackageVersion Include="ReactiveUI.Avalonia" Version="11.3.8" />
         <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.2" />
+        <PackageVersion Include="SkiaSharp" Version="3.119.4" />
 
         <PackageVersion Include="Xamarin.AndroidX.Core.SplashScreen" Version="1.0.1.15" />
     </ItemGroup>

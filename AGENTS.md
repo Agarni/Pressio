@@ -26,7 +26,9 @@ There is **no test project** yet; do not assume a test runner exists.
 
 Versions are centralized in `Directory.Packages.props` (`ManagePackageVersionsCentrally=true`). **Never** add a `Version` directly in a `.csproj`; add it to `Directory.Packages.props` instead.
 
-The Avalonia packages (Avalonia, Themes.Fluent, Fonts.Inter, Desktop, iOS, Browser, Android) **must all share the same version** — the file has a comment to keep them in sync. When bumping, bump them together. ReactiveUI.Avalonia and Microsoft.Data.Sqlite are versioned separately.
+The Avalonia packages (Avalonia, Themes.Fluent, Fonts.Inter, Desktop, iOS, Browser, Android) **must all share the same version** — the file has a comment to keep them in sync. When bumping, bump them together. ReactiveUI.Avalonia, Microsoft.Data.Sqlite, and SkiaSharp are versioned separately.
+
+`SkiaSharp` (same version Avalonia uses, 3.119.4) is a direct reference in `Pressio` for PDF generation via `Pressio/Services/PdfReportService.cs` (`SKDocument.CreatePdf`); the native Skia assets come from `Avalonia.Desktop` at runtime.
 
 ## Build/CI gotchas
 

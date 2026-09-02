@@ -34,6 +34,7 @@ O MVP está em andamento. Abaixo, o mapa do que já existe e o cronograma de con
 - [x] Dashboard com comparação antes/depois da medicação, distribuição por horário, fatores associados e gráfico de pressão maior/menor.
 - [x] Formulário de medição ampliado: frequência cardíaca, repouso, braço e posição (opcionais).
 - [x] Formato de exibição configurável (`13/8` ou `130/80`), persistido nas configurações.
+- [x] Relatórios: CSV e PDF (com resumo, gráfico e tabela), respeitando os filtros ativos.
 
 ### Roadmap
 
@@ -42,6 +43,7 @@ O MVP está em andamento. Abaixo, o mapa do que já existe e o cronograma de con
 - [x] **Fase 3 — Histórico e filtros (4.4):** filtro por período, horário e medicação; busca em observações; refletindo no dashboard.
 - [x] **Fase 4 — Dashboard (4.5):** comparação antes/depois, distribuição por horário, fatores associados e gráfico de sistólica e diastólica (média e contagem já refletem filtros).
 - [x] **Fase 5 — Formulário ampliado (4.2):** frequência cardíaca, repouso, braço/posição e formato de exibição configurável.
+- [x] **Fase 6 — Relatórios (4.6):** exportação CSV e PDF com resumo e gráfico, respeitando filtros.
 - [ ] **Fase 3 — Histórico e filtros (4.4):** filtro por período, horário e medicação; busca em observações; refletindo no dashboard.
 - [ ] **Fase 4 — Dashboard completo (4.5):** seletor de período, comparação antes/depois, distribuição por horário, calendário, gráfico de sistólica e diastólica.
 - [ ] **Fase 5 — Formulário ampliado (4.2):** frequência cardíaca, repouso, braço/posição, formato de exibição configurável.

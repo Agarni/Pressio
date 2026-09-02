@@ -233,6 +233,7 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> ShowPatientFormCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> SavePatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ExportCsvCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> ExportPdfCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> CancelPatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> EditPatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> DeletePatientCommand { get; private set; } = null!;
@@ -301,6 +302,7 @@ public class MainViewModel : ViewModelBase
             FilterSearch = string.Empty;
         });
         ExportCsvCommand = ReactiveCommand.Create(ExportCsv);
+        ExportPdfCommand = ReactiveCommand.Create(ExportPdf);
         foreach (var option in MeasurementContextInfo.AllContexts) ContextOptions.Add(new ContextOption(option.Value, option.Label));
         LoadAppSettings();
         foreach (var patient in _measurementRepository.GetPatients()) Patients.Add(patient);
@@ -397,10 +399,29 @@ public class MainViewModel : ViewModelBase
         var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Pressio");
         Directory.CreateDirectory(directory);
         var path = Path.Combine(directory, $"pressio-{SelectedPatient.Name.Replace(' ', '-')}-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
-        var rows = new[] { "Pressão;Data e hora;Medicação;Observação" }.Concat(Measurements.Select(m => $"{m.DisplayValue};{m.DisplayDate};{DescribeMedicationTiming(m.MedicationTiming)};{m.Notes?.Replace(';', ',') ?? string.Empty}"));
+        var rows = new[] { "Pressão;Data e hora;Medicação;Contexto;Observação" }.Concat(Measurements.Select(m =>
+            $"{m.DisplayValue};{m.DisplayDate};{DescribeMedicationTiming(m.MedicationTiming)};{(m.HasContext ? m.DisplayContext : "—")};{m.Notes?.Replace(';', ',') ?? string.Empty}"));
         File.WriteAllLines(path, rows);
         ExportStatus = $"Relatório CSV salvo em: {path}";
     }
+
+    private void ExportPdf()
+    {
+        if (SelectedPatient is null || Measurements.Count == 0) { ExportStatus = "Não há medições para exportar."; return; }
+        var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Pressio");
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, $"pressio-{SelectedPatient.Name.Replace(' ', '-')}-{DateTime.Now:yyyyMMdd-HHmmss}.pdf");
+        PdfReportService.Export(path, SelectedPatient, Measurements.ToList(), FilterDescription());
+        ExportStatus = $"Relatório PDF salvo em: {path}";
+    }
+
+    private string FilterDescription() => string.Join(" · ", new[]
+    {
+        FilterPeriod,
+        FilterMedication,
+        FilterTimeOfDay,
+        string.IsNullOrWhiteSpace(FilterSearch) ? null : $"busca: \"{FilterSearch.Trim()}\""
+    }.Where(x => x is not null));
 
     private void EditPatient()
     {
