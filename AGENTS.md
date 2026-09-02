@@ -22,6 +22,10 @@ dotnet build                                           # whole solution
 
 There is **no test project** yet; do not assume a test runner exists.
 
+```sh
+bash scripts/package-macos.sh osx-arm64   # monta Pressio.app (ícone/Info.plist) e abre
+```
+
 ## Package management
 
 Versions are centralized in `Directory.Packages.props` (`ManagePackageVersionsCentrally=true`). **Never** add a `Version` directly in a `.csproj`; add it to `Directory.Packages.props` instead.
