@@ -6,7 +6,7 @@
         xmlns:views="using:Pressio.Views"
         mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="720"
         x:Class="Pressio.Views.MainWindow"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/pressio.ico"
         Title="Pressio"
         Width="1100"
         Height="720"
