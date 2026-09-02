@@ -81,6 +81,7 @@ public class MainViewModel : ViewModelBase
     private string _filterMedication = "Todas";
     private string _filterTimeOfDay = "Todos os horários";
     private string _filterSearch = string.Empty;
+    private string _reportPeriod = "Todo o histórico";
 
     public bool IsMeasurementFormVisible
     {
@@ -225,6 +226,8 @@ public class MainViewModel : ViewModelBase
         get => _filterSearch;
         set { if (_filterSearch != value) { _filterSearch = value; this.RaisePropertyChanged(nameof(FilterSearch)); ApplyFilters(); } }
     }
+    public IReadOnlyList<string> ReportPeriodOptions { get; } = new[] { "Todo o histórico", "Últimos 7 dias", "Últimos 30 dias" };
+    public string ReportPeriod { get => _reportPeriod; set => this.RaiseAndSetIfChanged(ref _reportPeriod, value); }
 
     public ReactiveCommand<Unit, Unit> ShowMeasurementFormCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> CancelMeasurementCommand { get; private set; } = null!;
@@ -399,23 +402,45 @@ public class MainViewModel : ViewModelBase
     private async Task ExportCsv()
     {
         if (SelectedPatient is null || Measurements.Count == 0) { ExportStatus = "Não há medições para exportar."; return; }
+        var (report, truncated) = BuildReportSet();
         var path = await RequestExportPath("csv", "CSV");
         if (path is null) { ExportStatus = "Exportação cancelada."; return; }
-        var rows = new[] { "Pressão;Data e hora;Medicação;Contexto;Observação" }.Concat(Measurements.Select(m =>
+        var rows = new[] { "Pressão;Data e hora;Medicação;Contexto;Observação" }.Concat(report.Select(m =>
             $"{m.DisplayValue};{m.DisplayDate};{DescribeMedicationTiming(m.MedicationTiming)};{(m.HasContext ? m.DisplayContext : "—")};{m.Notes?.Replace(';', ',') ?? string.Empty}"));
         File.WriteAllLines(path, rows);
         SaveExportDirectory(path);
-        ExportStatus = $"Relatório CSV salvo em: {path}";
+        ExportStatus = $"Relatório CSV salvo em: {path}{(truncated ? " (últimos 30 registros)" : "")}";
     }
 
     private async Task ExportPdf()
     {
         if (SelectedPatient is null || Measurements.Count == 0) { ExportStatus = "Não há medições para exportar."; return; }
+        var (report, truncated) = BuildReportSet();
         var path = await RequestExportPath("pdf", "PDF");
         if (path is null) { ExportStatus = "Exportação cancelada."; return; }
-        PdfReportService.Export(path, SelectedPatient, Measurements.ToList(), FilterDescription());
+        PdfReportService.Export(path, SelectedPatient, report, ReportDescription(), truncated);
         SaveExportDirectory(path);
-        ExportStatus = $"Relatório PDF salvo em: {path}";
+        ExportStatus = $"Relatório PDF salvo em: {path}{(truncated ? " (últimos 30 registros)" : "")}";
+    }
+
+    private (List<BloodPressureMeasurement> Items, bool Truncated) BuildReportSet()
+    {
+        IEnumerable<BloodPressureMeasurement> query = Measurements;
+        if (ReportPeriod != "Todo o histórico")
+        {
+            var from = ReportPeriod == "Últimos 7 dias" ? DateTime.Today.AddDays(-6) : DateTime.Today.AddDays(-29);
+            query = query.Where(m => m.MeasuredAt.Date >= from);
+        }
+        var list = query.OrderByDescending(m => m.MeasuredAt).ToList();
+        var truncated = list.Count > 30;
+        if (truncated) list = list.Take(30).ToList();
+        return (list.OrderBy(m => m.MeasuredAt).ToList(), truncated);
+    }
+
+    private string ReportDescription()
+    {
+        var parts = new[] { FilterDescription(), $"Período do relatório: {ReportPeriod}" };
+        return string.Join("   •   ", parts);
     }
 
     private async Task<string?> RequestExportPath(string extension, string kind)

@@ -8,6 +8,7 @@
   
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
+    <EmbeddedResource Include="Assets\Icon.png" LogicalName="Pressio.Assets.Icon.png" />
   </ItemGroup>
 
   <ItemGroup>
