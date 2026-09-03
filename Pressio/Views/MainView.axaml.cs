@@ -89,7 +89,12 @@ public partial class MainView : UserControl
                     Title = "Escolha a pasta de sincronização (OneDrive / Google Drive / iCloud)",
                     AllowMultiple = false
                 });
-                ctx.SetOutput(folders.Count > 0 ? folders[0].TryGetLocalPath() : null);
+                // Para pastas "cloud" (ex.: iCloud), TryGetLocalPath pode retornar null;
+                // usamos o local path da URI como fallback.
+                var path = folders.Count > 0
+                    ? folders[0].TryGetLocalPath() ?? folders[0].Path.LocalPath
+                    : null;
+                ctx.SetOutput(path);
             }
             catch
             {

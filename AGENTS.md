@@ -25,9 +25,12 @@ dotnet test Pressio.Tests/Pressio.Tests.csproj         # unit tests (parser + re
 bash scripts/package-macos.sh osx-arm64   # monta Pressio.app (ícone/Info.plist) e abre
 bash scripts/run-android.sh               # build + install + abre o app no emulador/dispositivo via adb
 bash scripts/build-ios-altstore.sh        # .ipa SEM assinatura p/ instalar no iPhone via AltStore
+bash scripts/deploy-ios-device.sh         # build + install + launch no iPhone físico (provisioning + assinatura)
 ```
 
 **Teste de device iOS:** para instalar sem passar pela App Store, rode `bash scripts/build-ios-altstore.sh` (builds `Pressio.iOS` em `Release/ios-arm64` com codesign desabilitado) e envie o `.ipa` ao **AltStore** — o AltServer assina com seu Apple ID gratuito (validade ~7 dias; AltStore renova com o Mac+AltServer ligados). O projeto iOS só usa notificações locais (`UNUserNotificationCenter`), então a assinatura free funciona. Para **TestFlight/Ad-Hoc** (conta paga), aponte `CodesignKey`/`ProvisioningProfile` no `Pressio.iOS.csproj`.
+
+**Deploy direto no iPhone (Xcode/devicectl):** `bash scripts/deploy-ios-device.sh` compila, instala e abre. Pré-requisitos (conta gratuita): adicionar o Apple ID no Xcode (gera o certificado "Apple Development"), ativar o **Modo de desenvolvedor** no iPhone e criar o provisioning profile com um projeto iOS descartável no Xcode (bundle id `agarnidev.Pressio`). **Atenção:** o Xcode guarda os `.mobileprovision` em `~/Library/Developer/Xcode/UserData/Provisioning Profiles/`, mas o .NET iOS **só procura em `~/Library/MobileDevice/Provisioning Profiles/`** — copie o profile do seu bundle id para lá (o script já faz isso).
 
 ## Package management
 
