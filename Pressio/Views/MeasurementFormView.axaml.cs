@@ -12,7 +12,13 @@ public partial class MeasurementFormView : UserControl
         DataContextChanged += (_, _) =>
         {
             if (DataContext is MeasurementFormViewModel vm)
+            {
+                vm.Shown -= OnShown;
                 vm.Shown += OnShown;
+                // Na 1ª abertura a View é criada após o comando disparar `Shown`;
+                // chamamos aqui para cobrir esse caso.
+                OnShown();
+            }
         };
     }
 

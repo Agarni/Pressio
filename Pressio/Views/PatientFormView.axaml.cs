@@ -12,7 +12,11 @@ public partial class PatientFormView : UserControl
         DataContextChanged += (_, _) =>
         {
             if (DataContext is PatientFormViewModel vm)
+            {
+                vm.Shown -= OnShown;
                 vm.Shown += OnShown;
+                OnShown();
+            }
         };
     }
 
