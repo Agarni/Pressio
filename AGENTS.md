@@ -37,6 +37,7 @@ The Avalonia packages (Avalonia, Themes.Fluent, Fonts.Inter, Desktop, iOS, Brows
 
 ## Build/CI gotchas
 
+- Android: o `.NET for Android` exige **JDK 17+** (o `manifestmerger` é compilado para Java 17). Um `Directory.Build.props` na raiz aponta `JavaSdkDirectory` para o JDK 17 do sistema quando presente; caso contrário o SDK decide. Se o build Android falhar com `UnsupportedClassVersionError`, o JDK em uso é Java 11 — aponte `JavaSdkDirectory`/`JAVA_HOME` para um JDK 17.
 - iOS Debug uses `<UseInterpreter>true</UseInterpreter>` to avoid premature AOT loading; Release keeps `MtouchNoSymbolStrip` as a workaround for Xcode 26.6. Don't remove these without reason.
 - **iOS app icon:** supplied via `Pressio.iOS/Info.plist` `CFBundleIcons`/`CFBundleIconFiles` + PNGs in `Pressio.iOS/Resources/AppIcon-*.png`. Do **not** rely on an `Assets.xcassets`/`AppIcon` asset catalog — the .NET/iOS toolchain here does **not** compile it into an `Assets.car` (its `actool/bundle/` stays empty). Icon/`Info.plist` changes need a **clean build** (`dotnet clean`) + reinstall, because incremental builds may not re-merge the `Info.plist`.
 
