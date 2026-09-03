@@ -385,10 +385,14 @@ public class MainViewModel : ViewModelBase
         foreach (var day in ReminderInfo.AllDays) ReminderDayOptions.Add(new ReminderDayOption(day.Value, day.Label));
         try { Observable.Interval(TimeSpan.FromSeconds(20), RxApp.MainThreadScheduler).Subscribe(_ => CheckDueReminders()); } catch { }
         RescheduleEnabledReminders();
-        _isAboutSplash = true;
-        this.RaisePropertyChanged(nameof(IsAboutCloseVisible));
-        IsAboutVisible = true;
-        Observable.Timer(TimeSpan.FromMilliseconds(1800), RxApp.MainThreadScheduler).Subscribe(_ => { _isAboutSplash = false; this.RaisePropertyChanged(nameof(IsAboutCloseVisible)); IsAboutVisible = false; });
+        _isAboutSplash = false;
+        if (!IsMobileLayout)
+        {
+            _isAboutSplash = true;
+            this.RaisePropertyChanged(nameof(IsAboutCloseVisible));
+            IsAboutVisible = true;
+            Observable.Timer(TimeSpan.FromMilliseconds(1800), RxApp.MainThreadScheduler).Subscribe(_ => { _isAboutSplash = false; this.RaisePropertyChanged(nameof(IsAboutCloseVisible)); IsAboutVisible = false; });
+        }
         ExportCsvCommand = ReactiveCommand.CreateFromTask(ExportCsv);
         ExportPdfCommand = ReactiveCommand.CreateFromTask(ExportPdf);
         foreach (var option in MeasurementContextInfo.AllContexts) ContextOptions.Add(new ContextOption(option.Value, option.Label));
