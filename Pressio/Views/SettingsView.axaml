@@ -7,12 +7,21 @@
   <UserControl.Resources>
     <conv:ColorMatchConverter x:Key="ColorMatchConverter" />
   </UserControl.Resources>
-  <StackPanel Spacing="14">
+  <Grid RowDefinitions="*,Auto">
+    <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Spacing="14" Margin="20,16,20,16">
     <StackPanel Spacing="5"><TextBlock Text="Tema" FontSize="12" FontWeight="SemiBold" /><ComboBox ItemsSource="{Binding AppearanceOptions}" SelectedItem="{Binding SelectedAppearance}" /></StackPanel>
     <StackPanel Spacing="5"><TextBlock Text="Formato de exibição" FontSize="12" FontWeight="SemiBold" /><ComboBox ItemsSource="{Binding MeasurementDisplayFormatOptions}" SelectedItem="{Binding SelectedDisplayFormat}" /><TextBlock Text="Ex.: 13/8 ou 130/80" FontSize="11" Foreground="{DynamicResource PressioMutedBrush}" /></StackPanel>
     <StackPanel Spacing="8"><TextBlock Text="Cor primária" FontSize="12" FontWeight="SemiBold" /><StackPanel Orientation="Horizontal" Spacing="8"><Button Classes="color-swatch" Background="#5B5BD6" ToolTip.Tip="Índigo" Command="{Binding SelectPrimaryColorCommand}" CommandParameter="Índigo"><PathIcon Data="M9,16.17L4.83,12L3.41,13.41L9,19L21,7L19.59,5.59L9,16.17Z" Foreground="White" IsVisible="{Binding SelectedPrimaryColor, Converter={StaticResource ColorMatchConverter}, ConverterParameter=Índigo}" /></Button><Button Classes="color-swatch" Background="#2775D8" ToolTip.Tip="Azul" Command="{Binding SelectPrimaryColorCommand}" CommandParameter="Azul"><PathIcon Data="M9,16.17L4.83,12L3.41,13.41L9,19L21,7L19.59,5.59L9,16.17Z" Foreground="White" IsVisible="{Binding SelectedPrimaryColor, Converter={StaticResource ColorMatchConverter}, ConverterParameter=Azul}" /></Button><Button Classes="color-swatch" Background="#16846F" ToolTip.Tip="Verde" Command="{Binding SelectPrimaryColorCommand}" CommandParameter="Verde"><PathIcon Data="M9,16.17L4.83,12L3.41,13.41L9,19L21,7L19.59,5.59L9,16.17Z" Foreground="White" IsVisible="{Binding SelectedPrimaryColor, Converter={StaticResource ColorMatchConverter}, ConverterParameter=Verde}" /></Button><Button Classes="color-swatch" Background="#7954C8" ToolTip.Tip="Roxo" Command="{Binding SelectPrimaryColorCommand}" CommandParameter="Roxo"><PathIcon Data="M9,16.17L4.83,12L3.41,13.41L9,19L21,7L19.59,5.59L9,16.17Z" Foreground="White" IsVisible="{Binding SelectedPrimaryColor, Converter={StaticResource ColorMatchConverter}, ConverterParameter=Roxo}" /></Button><Button Classes="color-swatch" Background="#D65B54" ToolTip.Tip="Coral" Command="{Binding SelectPrimaryColorCommand}" CommandParameter="Coral"><PathIcon Data="M9,16.17L4.83,12L3.41,13.41L9,19L21,7L19.59,5.59L9,16.17Z" Foreground="White" IsVisible="{Binding SelectedPrimaryColor, Converter={StaticResource ColorMatchConverter}, ConverterParameter=Coral}" /></Button></StackPanel><TextBlock Text="O tema e a cor são aplicados ao clicar em Aplicar." FontSize="11" Foreground="{DynamicResource PressioMutedBrush}" /></StackPanel>
     <Border Background="#EEF0FF" CornerRadius="10" Padding="14"><TextBlock Text="A cor selecionada é indicada pela marcação dentro do círculo." Foreground="{DynamicResource PressioPrimaryBrush}" FontSize="12" TextWrapping="Wrap" /></Border>
     <StackPanel Spacing="8"><TextBlock Text="Dados" FontSize="12" FontWeight="SemiBold" /><TextBlock Text="Faça backup ou restaure seus dados." FontSize="11" Foreground="{DynamicResource PressioMutedBrush}" /><StackPanel Orientation="Horizontal" Spacing="8"><Button Classes="secondary-button" Content="Backup" Command="{Binding BackupCommand}" /><Button Classes="secondary-button" Content="Restaurar" Command="{Binding RestoreCommand}" /></StackPanel><TextBlock Text="{Binding ExportStatus}" FontSize="11" Foreground="{DynamicResource PressioMutedBrush}" TextWrapping="Wrap" /></StackPanel>
-    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8"><Button Classes="secondary-button" Content="Cancelar" Command="{Binding CancelCommand}" /><Button Classes="primary-button" Content="Aplicar" Command="{Binding ApplyCommand}" /></StackPanel>
-  </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+    <Border Grid.Row="1" BorderBrush="{DynamicResource PressioBorderBrush}" BorderThickness="0,1,0,0" Padding="20,12">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+        <Button Classes="secondary-button" Content="Cancelar" Command="{Binding CancelCommand}" />
+        <Button Classes="primary-button" Content="Aplicar" Command="{Binding ApplyCommand}" />
+      </StackPanel>
+    </Border>
+  </Grid>
 </UserControl>

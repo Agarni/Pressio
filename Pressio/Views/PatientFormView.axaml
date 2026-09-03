@@ -3,13 +3,19 @@
              xmlns:vm="using:Pressio.ViewModels"
              x:Class="Pressio.Views.PatientFormView"
              x:DataType="vm:PatientFormViewModel">
-  <StackPanel Spacing="14">
-    <TextBlock Text="Crie ou atualize o perfil que terá suas próprias medições." FontSize="13" Foreground="{DynamicResource PressioMutedBrush}" TextWrapping="Wrap" />
-    <TextBox Text="{Binding NewPatientName}" PlaceholderText="Nome do paciente" />
-    <TextBlock Text="{Binding PatientError}" FontSize="12" Foreground="#B42318" />
-    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-      <Button Classes="secondary-button" Content="Cancelar" Command="{Binding CancelCommand}" />
-      <Button Classes="primary-button" Content="Salvar paciente" Command="{Binding SaveCommand}" />
-    </StackPanel>
-  </StackPanel>
+  <Grid RowDefinitions="*,Auto">
+    <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Spacing="14" Margin="20,16,20,16">
+        <TextBlock Text="Crie ou atualize o perfil que terá suas próprias medições." FontSize="13" Foreground="{DynamicResource PressioMutedBrush}" TextWrapping="Wrap" />
+        <TextBox x:Name="PatientNameInput" Text="{Binding NewPatientName}" PlaceholderText="Nome do paciente" />
+        <TextBlock Text="{Binding PatientError}" FontSize="12" Foreground="#B42318" />
+      </StackPanel>
+    </ScrollViewer>
+    <Border Grid.Row="1" BorderBrush="{DynamicResource PressioBorderBrush}" BorderThickness="0,1,0,0" Padding="20,12">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+        <Button Classes="secondary-button" Content="Cancelar" Command="{Binding CancelCommand}" />
+        <Button Classes="primary-button" Content="Salvar paciente" Command="{Binding SaveCommand}" />
+      </StackPanel>
+    </Border>
+  </Grid>
 </UserControl>

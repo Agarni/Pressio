@@ -4,18 +4,27 @@
              xmlns:m="using:Pressio.Models"
              x:Class="Pressio.Views.MeasurementFormView"
              x:DataType="vm:MeasurementFormViewModel">
-  <StackPanel Spacing="14">
-    <TextBlock Text="Digite 13/8 ou 130/80. Você pode ajustar data e horário." FontSize="13" Foreground="{DynamicResource PressioMutedBrush}" TextWrapping="Wrap" />
-    <TextBox Text="{Binding BloodPressureInput}" PlaceholderText="Ex.: 13/8" FontSize="24" Padding="12" />
-    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-      <StackPanel Spacing="5"><TextBlock Text="Data da aferição" FontSize="12" FontWeight="SemiBold" /><CalendarDatePicker SelectedDate="{Binding MeasurementDate}" PlaceholderText="Escolha a data" /></StackPanel>
-      <StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="Hora da aferição" FontSize="12" FontWeight="SemiBold" /><TimePicker SelectedTime="{Binding MeasurementTime}" ClockIdentifier="24HourClock" /></StackPanel>
-    </Grid>
-    <StackPanel Spacing="5"><TextBlock Text="Medicação" FontSize="12" FontWeight="SemiBold" /><ComboBox ItemsSource="{Binding MedicationOptions}" SelectedItem="{Binding SelectedMedicationOption}" /></StackPanel>
-    <StackPanel Spacing="6"><TextBlock Text="Contexto da aferição" FontSize="12" FontWeight="SemiBold" /><ItemsControl ItemsSource="{Binding ContextOptions}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate x:DataType="m:ContextOption"><ToggleButton Classes="toggle-chip" IsChecked="{Binding IsSelected}" Content="{Binding Label}" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></StackPanel>
-    <StackPanel Spacing="6"><TextBlock Text="Detalhes (opcionais)" FontSize="12" FontWeight="SemiBold" /><Grid ColumnDefinitions="*,*,*" ColumnSpacing="12"><StackPanel Spacing="4"><TextBlock Text="Frequência cardíaca (bpm)" FontSize="11" FontWeight="SemiBold" /><TextBox Text="{Binding HeartRateInput}" PlaceholderText="Ex.: 72" /></StackPanel><StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="Braço" FontSize="11" FontWeight="SemiBold" /><ComboBox ItemsSource="{Binding ArmOptions}" SelectedItem="{Binding SelectedArm}" /></StackPanel><StackPanel Grid.Column="2" Spacing="4"><TextBlock Text="Posição" FontSize="11" FontWeight="SemiBold" /><ComboBox ItemsSource="{Binding PositionOptions}" SelectedItem="{Binding SelectedPosition}" /></StackPanel></Grid><CheckBox Content="Em repouso antes da aferição" IsChecked="{Binding AtRest}" Foreground="{DynamicResource PressioTextBrush}" /></StackPanel>
-    <TextBox Text="{Binding Notes}" PlaceholderText="Observação opcional (ex.: dor de cabeça)" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" />
-    <TextBlock Text="{Binding MeasurementError}" Foreground="#B42318" FontSize="12" TextWrapping="Wrap" />
-    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8"><Button Classes="secondary-button" Content="Cancelar" Command="{Binding CancelCommand}" /><Button Classes="primary-button" Content="Salvar medição" Command="{Binding SaveCommand}" /></StackPanel>
-  </StackPanel>
+  <Grid RowDefinitions="*,Auto">
+    <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Spacing="14" Margin="20,16,20,16">
+        <TextBlock Text="Digite 13/8 ou 130/80. Você pode ajustar data e horário." FontSize="13" Foreground="{DynamicResource PressioMutedBrush}" TextWrapping="Wrap" />
+        <TextBox x:Name="PressureInput" Text="{Binding BloodPressureInput}" PlaceholderText="Ex.: 13/8" FontSize="24" Padding="12" />
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+          <StackPanel Spacing="5"><TextBlock Text="Data da aferição" FontSize="12" FontWeight="SemiBold" /><CalendarDatePicker SelectedDate="{Binding MeasurementDate}" PlaceholderText="Escolha a data" /></StackPanel>
+          <StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="Hora da aferição" FontSize="12" FontWeight="SemiBold" /><TimePicker SelectedTime="{Binding MeasurementTime}" ClockIdentifier="24HourClock" /></StackPanel>
+        </Grid>
+        <StackPanel Spacing="5"><TextBlock Text="Medicação" FontSize="12" FontWeight="SemiBold" /><ComboBox ItemsSource="{Binding MedicationOptions}" SelectedItem="{Binding SelectedMedicationOption}" /></StackPanel>
+        <StackPanel Spacing="6"><TextBlock Text="Contexto da aferição" FontSize="12" FontWeight="SemiBold" /><ItemsControl ItemsSource="{Binding ContextOptions}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate x:DataType="m:ContextOption"><ToggleButton Classes="toggle-chip" IsChecked="{Binding IsSelected}" Content="{Binding Label}" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></StackPanel>
+        <StackPanel Spacing="6"><TextBlock Text="Detalhes (opcionais)" FontSize="12" FontWeight="SemiBold" /><Grid ColumnDefinitions="*,*,*" ColumnSpacing="12"><StackPanel Spacing="4"><TextBlock Text="Frequência cardíaca (bpm)" FontSize="11" FontWeight="SemiBold" /><TextBox Text="{Binding HeartRateInput}" PlaceholderText="Ex.: 72" /></StackPanel><StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="Braço" FontSize="11" FontWeight="SemiBold" /><ComboBox ItemsSource="{Binding ArmOptions}" SelectedItem="{Binding SelectedArm}" /></StackPanel><StackPanel Grid.Column="2" Spacing="4"><TextBlock Text="Posição" FontSize="11" FontWeight="SemiBold" /><ComboBox ItemsSource="{Binding PositionOptions}" SelectedItem="{Binding SelectedPosition}" /></StackPanel></Grid><CheckBox Content="Em repouso antes da aferição" IsChecked="{Binding AtRest}" Foreground="{DynamicResource PressioTextBrush}" /></StackPanel>
+        <TextBox Text="{Binding Notes}" PlaceholderText="Observação opcional (ex.: dor de cabeça)" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" />
+        <TextBlock Text="{Binding MeasurementError}" Foreground="#B42318" FontSize="12" TextWrapping="Wrap" />
+      </StackPanel>
+    </ScrollViewer>
+    <Border Grid.Row="1" BorderBrush="{DynamicResource PressioBorderBrush}" BorderThickness="0,1,0,0" Padding="20,12">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+        <Button Classes="secondary-button" Content="Cancelar" Command="{Binding CancelCommand}" />
+        <Button Classes="primary-button" Content="Salvar medição" Command="{Binding SaveCommand}" />
+      </StackPanel>
+    </Border>
+  </Grid>
 </UserControl>
