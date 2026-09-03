@@ -183,7 +183,6 @@ public class MainViewModel : ViewModelBase
         }
     }
     public BloodPressureMeasurement? SelectedMeasurement { get => _selectedMeasurement; set => this.RaiseAndSetIfChanged(ref _selectedMeasurement, value); }
-    public string ImageImportStatus { get; private set; } = "";
     public bool IsPatientFormVisible
     {
         get => _isPatientFormVisible;
@@ -280,7 +279,6 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> SaveMeasurementCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> DeleteMeasurementCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> EditMeasurementCommand { get; private set; } = null!;
-    public ReactiveCommand<Unit, Unit> ImportMeasurementImageCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ShowPatientFormCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> SavePatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ExportCsvCommand { get; private set; } = null!;
@@ -337,7 +335,6 @@ public class MainViewModel : ViewModelBase
         SaveMeasurementCommand = ReactiveCommand.Create(SaveMeasurement);
         DeleteMeasurementCommand = ReactiveCommand.Create(DeleteSelectedMeasurement);
         EditMeasurementCommand = ReactiveCommand.Create(EditSelectedMeasurement);
-        ImportMeasurementImageCommand = ReactiveCommand.Create(() => { ImageImportStatus = "Importação por imagem será habilitada com OCR na próxima etapa."; });
         ShowPatientFormCommand = ReactiveCommand.Create(() => { _editingPatient = false; NewPatientName = string.Empty; IsPatientFormVisible = true; this.RaisePropertyChanged(nameof(PatientFormTitle)); });
         SavePatientCommand = ReactiveCommand.Create(SavePatient);
         CancelPatientCommand = ReactiveCommand.Create(() => { IsPatientFormVisible = false; NewPatientName = string.Empty; PatientError = string.Empty; });
