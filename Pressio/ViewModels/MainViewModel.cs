@@ -201,6 +201,7 @@ public class MainViewModel : ViewModelBase
     public Interaction<string, bool> ConfirmOpenInteraction { get; } = new();
     public Interaction<Unit, string?> OpenFileInteraction { get; } = new();
     public Interaction<Unit, string?> FolderPickerInteraction { get; } = new();
+    public Interaction<Unit, Unit> SyncNowInteraction { get; } = new();
     public ReactiveCommand<Unit, Unit> EditPatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> DeletePatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ShowSettingsCommand { get; private set; } = null!;
@@ -344,19 +345,23 @@ public class MainViewModel : ViewModelBase
     {
         var dir = _settingsRepository.GetLastSyncDirectory();
         if (string.IsNullOrWhiteSpace(dir)) { Settings.SyncStatus = "Escolha primeiro a pasta de sincronização."; return; }
-        try
-        {
-            var merged = _syncService.ImportFromFile(Path.Combine(dir, "pressio-sync.json"));
-            Settings.SyncStatus = $"Sincronizado às {DateTime.Now:HH:mm} — {merged.Patients.Count} pacientes, {merged.Measurements.Count} medições, {merged.Reminders.Count} lembretes.";
-            ReloadMeasurements();
-            ReloadReminders();
-            RescheduleEnabledReminders();
-        }
-        catch (Exception ex)
-        {
-            Settings.SyncStatus = "Falha ao sincronizar: " + ex.Message;
-        }
+        _ = SyncNowInteraction.Handle(Unit.Default);
     }
+
+    public string BuildLocalSyncJson() => _syncService.Serialize(_syncService.BuildLocalSnapshot());
+
+    /// <summary>Mescla o local com o remoto (string JSON), aplica no banco e retorna o JSON mesclado.</summary>
+    public string ApplyRemoteSync(string? remoteJson)
+    {
+        var merged = _syncService.ApplyRemote(remoteJson);
+        Settings.SyncStatus = $"Sincronizado às {DateTime.Now:HH:mm} — {merged.Patients.Count} pacientes, {merged.Measurements.Count} medições, {merged.Reminders.Count} lembretes.";
+        ReloadMeasurements();
+        ReloadReminders();
+        RescheduleEnabledReminders();
+        return _syncService.Serialize(merged);
+    }
+
+    public void SetSyncError(string message) => Settings.SyncStatus = message;
 
     private void SaveMeasurement()
     {

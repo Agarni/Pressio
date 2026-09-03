@@ -34,6 +34,17 @@ public sealed class SyncService
         Settings = _settings.GetSyncSettings()
     };
 
+    public string Serialize(SyncSnapshot snapshot) => _store.Serialize(snapshot);
+
+    /// <summary>Aplica o conteúdo remoto (string JSON) mesclando com o local; retorna o snapshot mesclado.</summary>
+    public SyncSnapshot ApplyRemote(string? remoteJson)
+    {
+        var remote = string.IsNullOrWhiteSpace(remoteJson) ? new SyncSnapshot() : _store.Deserialize(remoteJson);
+        var merged = Merge(BuildLocalSnapshot(), remote);
+        Apply(merged);
+        return merged;
+    }
+
     /// <summary>Mescla o local com o remoto: vence o registro de <c>UpdatedAt</c> mais recente (tie -> local).</summary>
     public SyncSnapshot Merge(SyncSnapshot local, SyncSnapshot remote) => new()
     {

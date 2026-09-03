@@ -140,6 +140,35 @@ public sealed class SyncTests : IDisposable
         Assert.True(snapshot.Settings.ContainsKey("SyncDeviceId"));
     }
 
+    [Fact]
+    public void ApplyRemote_MergesAndApplies()
+    {
+        var repo = new MeasurementRepository(_dbPath);
+        var reminders = new ReminderRepository(_dbPath);
+        var settings = new SettingsRepository(_dbPath);
+        var svc = new SyncService(repo, reminders, settings, "dev");
+
+        var remoteJson = svc.Serialize(new SyncSnapshot
+        {
+            Patients = { new SyncPatient { SyncId = "p-remoto", Name = "Maria", UpdatedAt = DateTimeOffset.UtcNow } }
+        });
+
+        var merged = svc.ApplyRemote(remoteJson);
+        Assert.Contains(merged.Patients, p => p.Name == "Maria");
+        Assert.Contains(repo.GetPatients(), p => p.Name == "Maria");
+    }
+
+    [Fact]
+    public void ApplyRemote_WithNoRemote_CreatesEmptyMerge()
+    {
+        var repo = new MeasurementRepository(_dbPath);
+        var reminders = new ReminderRepository(_dbPath);
+        var settings = new SettingsRepository(_dbPath);
+        var svc = new SyncService(repo, reminders, settings, "dev");
+        var merged = svc.ApplyRemote(null);
+        Assert.Single(merged.Patients); // o "Meu perfil" local
+    }
+
     private static SyncService CreateService(string path) =>
         new(new MeasurementRepository(path), new ReminderRepository(path), new SettingsRepository(path), "dev");
 

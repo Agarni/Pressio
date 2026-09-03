@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using System.Reactive;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -11,6 +13,7 @@ namespace Pressio.Views;
 public partial class MainView : UserControl
 {
     private bool _interactionsRegistered;
+    private IStorageFolder? _syncFolder;
 
     public MainView()
     {
@@ -89,17 +92,55 @@ public partial class MainView : UserControl
                     Title = "Escolha a pasta de sincronização (OneDrive / Google Drive / iCloud)",
                     AllowMultiple = false
                 });
+                _syncFolder = folders.Count > 0 ? folders[0] : null;
                 // Para pastas "cloud" (ex.: iCloud), TryGetLocalPath pode retornar null;
                 // usamos o local path da URI como fallback.
-                var path = folders.Count > 0
-                    ? folders[0].TryGetLocalPath() ?? folders[0].Path.LocalPath
+                var path = _syncFolder is not null
+                    ? _syncFolder.TryGetLocalPath() ?? _syncFolder.Path.LocalPath
                     : null;
                 ctx.SetOutput(path);
             }
             catch
             {
+                _syncFolder = null;
                 ctx.SetOutput(null);
             }
+        });
+
+        vm.SyncNowInteraction.RegisterHandler(async ctx =>
+        {
+            var provider = TopLevel.GetTopLevel(this)?.StorageProvider;
+            var folder = _syncFolder;
+            // Recomposição no desktop (pasta persistida entre aberturas).
+            if (folder is null && !string.IsNullOrWhiteSpace(vm.Settings.SyncDirectory) && provider is not null)
+                folder = await provider.TryGetFolderFromPathAsync(vm.Settings.SyncDirectory);
+            if (folder is null) { vm.SetSyncError("Escolha primeiro a pasta de sincronização."); ctx.SetOutput(Unit.Default); return; }
+
+            try
+            {
+                var file = await folder.GetFileAsync("pressio-sync.json");
+                string? remoteJson = null;
+                if (file is not null)
+                {
+                    await using var read = await file.OpenReadAsync();
+                    using var reader = new StreamReader(read);
+                    remoteJson = await reader.ReadToEndAsync();
+                }
+
+                var mergedJson = vm.ApplyRemoteSync(remoteJson);
+
+                // Reescreve o arquivo (vazio primeiro para sobrescrever por completo).
+                var outFile = file ?? await folder.CreateFileAsync("pressio-sync.json");
+                await using var write = await outFile!.OpenWriteAsync();
+                write.SetLength(0);
+                using var writer = new StreamWriter(write);
+                await writer.WriteAsync(mergedJson);
+            }
+            catch (Exception ex)
+            {
+                vm.SetSyncError("Falha ao sincronizar: " + ex.Message);
+            }
+            ctx.SetOutput(Unit.Default);
         });
     }
 }
