@@ -8,6 +8,9 @@
     <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <!-- Embutir as assemblies no APK para poder instalar via `adb install`/fora do Rider.
+         (Fast Deployment exige push das .dll; com isso o APK é autossuficiente.) -->
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
     <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
     <!-- .NET for Android: o manifestmerger exige JDK 17+; usa o JDK 17 local quando presente.
          Preciso ficar aqui no .csproj (não só no Directory.Build.props) porque o Rider compila

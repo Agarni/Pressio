@@ -64,7 +64,7 @@ public sealed class AndroidNotificationService : INotificationService
         intent.PutExtra("id", (int)reminder.Id);
         intent.PutExtra("title", "Pressio — hora de aferir a pressão");
         intent.PutExtra("message", reminder.DisplayTime + " — hora de aferir a pressão");
-        return PendingIntent.GetBroadcast(_context, (int)reminder.Id, intent, PendingIntentFlags.UpdateCurrent);
+        return PendingIntent.GetBroadcast(_context, (int)reminder.Id, intent, PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
     }
 
     private void EnsureChannel()
