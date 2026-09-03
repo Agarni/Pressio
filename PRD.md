@@ -39,7 +39,7 @@ O MVP está em andamento. Abaixo, o mapa do que já existe e o cronograma de con
 
 ### Roadmap
 
-- [ ] **Fase 1 — Consistência/fundação:** falta refatorar os formulários em Views/ViewModels separadas via `ViewLocator`. (`separador de espaço no parser`, `persistir aparência/cor primária` e `confirmação de exclusão` já concluídos.)
+- [x] **Fase 1 — Consistência/fundação:** separador de espaço no parser, persistência de aparência/cor primária, confirmação de exclusão e refatoração dos formulários em Views/ViewModels separadas via `ViewLocator`.
 - [x] **Fase 2 — Contexto da aferição (4.3):** entidade e coluna de fatores contextuais, seleção por chips no formulário e exibição no histórico.
 - [x] **Fase 3 — Histórico e filtros (4.4):** filtro por período, horário e medicação; busca em observações; refletindo no dashboard.
 - [x] **Fase 4 — Dashboard (4.5):** comparação antes/depois, distribuição por horário, fatores associados e gráfico de sistólica e diastólica (média e contagem já refletem filtros).
