@@ -23,7 +23,7 @@ public sealed class ReminderRepository
     {
         using var connection = Open();
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT Id, Time, Days, Enabled, Note FROM Reminders ORDER BY Time";
+        command.CommandText = "SELECT Id, Time, Days, Enabled, Note FROM Reminders WHERE Deleted=0 ORDER BY Time";
         using var reader = command.ExecuteReader();
         var items = new List<Reminder>();
         while (reader.Read())
@@ -62,8 +62,9 @@ public sealed class ReminderRepository
     {
         using var connection = Open();
         using var command = connection.CreateCommand();
-        command.CommandText = "DELETE FROM Reminders WHERE Id=$id";
+        command.CommandText = "UPDATE Reminders SET Deleted=1, UpdatedAtUtc=$updatedAt WHERE Id=$id";
         command.Parameters.AddWithValue("$id", id);
+        command.Parameters.AddWithValue("$updatedAt", DateTime.UtcNow.ToString("O"));
         command.ExecuteNonQuery();
     }
 
@@ -71,7 +72,7 @@ public sealed class ReminderRepository
     {
         using var connection = Open();
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT SyncId, Time, Days, Enabled, Note, UpdatedAtUtc FROM Reminders";
+        command.CommandText = "SELECT SyncId, Time, Days, Enabled, Note, UpdatedAtUtc, Deleted FROM Reminders";
         using var reader = command.ExecuteReader();
         var items = new List<SyncReminder>();
         while (reader.Read())
@@ -82,9 +83,48 @@ public sealed class ReminderRepository
                 Days = (ReminderDays)reader.GetInt32(2),
                 Enabled = reader.GetInt32(3) != 0,
                 Note = reader.IsDBNull(4) ? null : reader.GetString(4),
-                UpdatedAt = DateTimeOffset.Parse(reader.GetString(5), System.Globalization.CultureInfo.InvariantCulture)
+                UpdatedAt = DateTimeOffset.Parse(reader.GetString(5), System.Globalization.CultureInfo.InvariantCulture),
+                Deleted = reader.GetInt32(6) != 0
             });
         return items;
+    }
+
+    public void DeleteReminderBySyncId(string syncId)
+    {
+        using var connection = Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE Reminders SET Deleted=1, UpdatedAtUtc=$updatedAt WHERE SyncId=$syncId";
+        command.Parameters.AddWithValue("$syncId", syncId);
+        command.Parameters.AddWithValue("$updatedAt", DateTime.UtcNow.ToString("O"));
+        command.ExecuteNonQuery();
+    }
+
+    public void UpsertReminder(SyncReminder reminder)
+    {
+        using var connection = Open();
+        using var find = connection.CreateCommand();
+        find.CommandText = "SELECT Id FROM Reminders WHERE SyncId=$syncId";
+        find.Parameters.AddWithValue("$syncId", reminder.SyncId);
+        var existing = find.ExecuteScalar() as long?;
+        if (existing is not null)
+        {
+            using var update = connection.CreateCommand();
+            update.CommandText = "UPDATE Reminders SET Time=$time, Days=$days, Enabled=$enabled, Note=$note, SyncId=$syncId, UpdatedAtUtc=$updatedAt, Deleted=0 WHERE Id=$id";
+            Bind(update, new Reminder(existing.Value, reminder.Time, reminder.Days, reminder.Enabled, reminder.Note));
+            update.Parameters.AddWithValue("$syncId", reminder.SyncId);
+            update.Parameters.AddWithValue("$updatedAt", reminder.UpdatedAt.UtcDateTime.ToString("O"));
+            update.Parameters.AddWithValue("$id", existing.Value);
+            update.ExecuteNonQuery();
+        }
+        else
+        {
+            using var insert = connection.CreateCommand();
+            insert.CommandText = "INSERT INTO Reminders (Time, Days, Enabled, Note, SyncId, UpdatedAtUtc, Deleted) VALUES ($time, $days, $enabled, $note, $syncId, $updatedAt, 0); SELECT last_insert_rowid();";
+            Bind(insert, new Reminder(0, reminder.Time, reminder.Days, reminder.Enabled, reminder.Note));
+            insert.Parameters.AddWithValue("$syncId", reminder.SyncId);
+            insert.Parameters.AddWithValue("$updatedAt", reminder.UpdatedAt.UtcDateTime.ToString("O"));
+            insert.ExecuteNonQuery();
+        }
     }
 
     private SqliteConnection Open() { var connection = new SqliteConnection(_connectionString); connection.Open(); return connection; }
@@ -106,6 +146,7 @@ public sealed class ReminderRepository
 
         EnsureColumn(connection, "SyncId", "TEXT NULL");
         EnsureColumn(connection, "UpdatedAtUtc", "TEXT NULL");
+        EnsureColumn(connection, "Deleted", "INTEGER NOT NULL DEFAULT 0");
         using var backfill = connection.CreateCommand();
         backfill.CommandText = @"UPDATE Reminders SET SyncId = lower(hex(randomblob(16))) WHERE SyncId IS NULL OR SyncId = '';
 UPDATE Reminders SET UpdatedAtUtc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE UpdatedAtUtc IS NULL OR UpdatedAtUtc = '';";

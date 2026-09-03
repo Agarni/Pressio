@@ -201,10 +201,10 @@ Privacidade: dados de saúde são sensíveis — em nuvem, criptografe os payloa
 
 ## 11. Plano de implementação (fases)
 
-- **Fase S1 — Fundação:** migração `SyncId`/`PatientSyncId`/`UpdatedAtUtc` + backfill; DTOs de snapshot; serialização de `pressio-sync.json` (com testes).
-- **Fase S2 — Export/Import local:** exportar o snapshot para um `.json` e importá-lo (merge) — já dá para "levar" dados entre máquinas manualmente.
-- **Fase S3 — Pasta de nuvem:** seletor de pasta + "Sincronizar agora" + resumo; persistir `LastSyncDirectory`.
-- **Fase S4 — Refinamentos:** auto-sync ao abrir o app (opcional); compactar tombstones; status/diagnóstico na tela "Sobre".
+- [x] **Fase S1 — Fundação:** migração `SyncId`/`PatientSyncId`/`UpdatedAtUtc` + backfill; DTOs de snapshot; serialização de `pressio-sync.json` (com testes).
+- [x] **Fase S2 — Export/Import local:** `SyncService.Merge` (LWW por `syncId`/`updatedAt`, tie → local) + `Apply` no banco (upsert + tombstone `Deleted`); exportar/importar `.json` entre máquinas (testado). Exclusões locais viram **tombstone** (`Deleted=1`) para viajarem entre dispositivos.
+- [ ] **Fase S3 — Pasta de nuvem:** seletor de pasta + "Sincronizar agora" + resumo; persistir `LastSyncDirectory`.
+- [ ] **Fase S4 — Refinamentos:** auto-sync ao abrir o app (opcional); compactar tombstones; status/diagnóstico na tela "Sobre".
 
 > **Fases S1–S2 já entregam valor real** (transferência por arquivo) sem depender de cliente de nuvem para testar.
 

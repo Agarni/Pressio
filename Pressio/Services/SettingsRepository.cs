@@ -75,6 +75,17 @@ public sealed class SettingsRepository
         return id;
     }
 
+    public void SetSync(string key, string value, DateTimeOffset updatedAt)
+    {
+        using var connection = Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "INSERT OR REPLACE INTO Settings (Key, Value, UpdatedAtUtc) VALUES ($key, $value, $updatedAt)";
+        command.Parameters.AddWithValue("$key", key);
+        command.Parameters.AddWithValue("$value", value);
+        command.Parameters.AddWithValue("$updatedAt", updatedAt.UtcDateTime.ToString("O"));
+        command.ExecuteNonQuery();
+    }
+
     private SqliteConnection Open() { var connection = new SqliteConnection(_connectionString); connection.Open(); return connection; }
 
     private void Initialize()

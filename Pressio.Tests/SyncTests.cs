@@ -139,4 +139,106 @@ public sealed class SyncTests : IDisposable
         Assert.Single(snapshot.Reminders);
         Assert.True(snapshot.Settings.ContainsKey("SyncDeviceId"));
     }
+
+    private static SyncService CreateService(string path) =>
+        new(new MeasurementRepository(path), new ReminderRepository(path), new SettingsRepository(path), "dev");
+
+    [Fact]
+    public void Merge_TakesNewestByUpdatedAt()
+    {
+        var svc = CreateService(_dbPath);
+        var t1 = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var t2 = new DateTimeOffset(2026, 1, 2, 0, 0, 0, TimeSpan.Zero);
+        var local = new SyncSnapshot { Patients = { new SyncPatient { SyncId = "p1", Name = "LocalNovo", UpdatedAt = t2 } } };
+        var remote = new SyncSnapshot
+        {
+            Patients =
+            {
+                new SyncPatient { SyncId = "p1", Name = "RemotoAntigo", UpdatedAt = t1 },
+                new SyncPatient { SyncId = "p2", Name = "RemotoUnico", UpdatedAt = t1 }
+            }
+        };
+
+        var merged = svc.Merge(local, remote);
+        Assert.Equal("LocalNovo", merged.Patients.Single(p => p.SyncId == "p1").Name);
+        Assert.Contains(merged.Patients, p => p.SyncId == "p2");
+    }
+
+    [Fact]
+    public void Merge_TombstoneWins()
+    {
+        var svc = CreateService(_dbPath);
+        var t1 = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var t2 = new DateTimeOffset(2026, 1, 2, 0, 0, 0, TimeSpan.Zero);
+        var local = new SyncSnapshot { Patients = { new SyncPatient { SyncId = "p1", Name = "João", UpdatedAt = t1 } } };
+        var remote = new SyncSnapshot { Patients = { new SyncPatient { SyncId = "p1", Deleted = true, UpdatedAt = t2 } } };
+
+        var merged = svc.Merge(local, remote);
+        Assert.True(merged.Patients.Single(p => p.SyncId == "p1").Deleted);
+    }
+
+    [Fact]
+    public void Apply_AddsAndDeletes()
+    {
+        var repo = new MeasurementRepository(_dbPath);
+        var reminders = new ReminderRepository(_dbPath);
+        var settings = new SettingsRepository(_dbPath);
+        var svc = new SyncService(repo, reminders, settings, "dev");
+
+        var patientSync = "p-sync-1";
+        var measureSync = "m-sync-1";
+        var reminderSync = "r-sync-1";
+        var now = DateTimeOffset.UtcNow;
+
+        var added = new SyncSnapshot
+        {
+            Patients = { new SyncPatient { SyncId = patientSync, Name = "João", UpdatedAt = now } },
+            Measurements = { new SyncMeasurement { SyncId = measureSync, PatientSyncId = patientSync, Systolic = 150, Diastolic = 95, MeasuredAtUtc = DateTime.UtcNow, MedicationTiming = MedicationTiming.BeforeMedication, UpdatedAt = now } },
+            Reminders = { new SyncReminder { SyncId = reminderSync, Time = new TimeSpan(8, 0, 0), Days = ReminderDays.All, Enabled = true, UpdatedAt = now } }
+        };
+        svc.Apply(added);
+        Assert.Contains(repo.GetPatients(), p => p.Name == "João");
+        Assert.Contains(repo.GetSyncMeasurements().ToList(), m => m.SyncId == measureSync && !m.Deleted);
+        Assert.Single(reminders.GetAll());
+
+        var deleted = new SyncSnapshot
+        {
+            Patients = { new SyncPatient { SyncId = patientSync, Name = "João", Deleted = true, UpdatedAt = now.AddMinutes(1) } },
+            Measurements = { new SyncMeasurement { SyncId = measureSync, PatientSyncId = patientSync, Systolic = 150, Diastolic = 95, MeasuredAtUtc = DateTime.UtcNow, MedicationTiming = MedicationTiming.BeforeMedication, Deleted = true, UpdatedAt = now.AddMinutes(1) } },
+            Reminders = { new SyncReminder { SyncId = reminderSync, Time = new TimeSpan(8, 0, 0), Days = ReminderDays.All, Enabled = true, Deleted = true, UpdatedAt = now.AddMinutes(1) } }
+        };
+        svc.Apply(deleted);
+        Assert.DoesNotContain(repo.GetPatients(), p => p.Name == "João");
+        Assert.Empty(repo.GetSyncMeasurements().ToList().Where(m => !m.Deleted));
+        Assert.Empty(reminders.GetAll());
+    }
+
+    [Fact]
+    public void ExportImport_TransfersAcrossDevices()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"pressio-json-{Guid.NewGuid():N}.json");
+        var dbA = Path.Combine(Path.GetTempPath(), $"pressio-a-{Guid.NewGuid():N}.db");
+        var dbB = Path.Combine(Path.GetTempPath(), $"pressio-b-{Guid.NewGuid():N}.db");
+        try
+        {
+            var ma = new MeasurementRepository(dbA);
+            var pa = ma.GetPatients().Single();
+            ma.AddPatient("João", null, null);
+            ma.Add(new BloodPressureMeasurement(160, 100, DateTime.Now, MedicationTiming.NotInformed), pa.Id);
+            var svcA = new SyncService(ma, new ReminderRepository(dbA), new SettingsRepository(dbA), "dev-a");
+            svcA.ExportToFile(filePath);
+
+            var mb = new MeasurementRepository(dbB);
+            var svcB = new SyncService(mb, new ReminderRepository(dbB), new SettingsRepository(dbB), "dev-b");
+            svcB.ImportFromFile(filePath);
+
+            Assert.Contains(mb.GetSyncPatients().ToList(), p => p.Name == "João");
+            Assert.Contains(mb.GetSyncMeasurements().ToList(), m => m.Systolic == 160);
+        }
+        finally
+        {
+            foreach (var f in new[] { filePath, dbA, dbA + "-wal", dbA + "-shm", dbB, dbB + "-wal", dbB + "-shm" })
+                if (File.Exists(f)) File.Delete(f);
+        }
+    }
 }
