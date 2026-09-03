@@ -51,16 +51,6 @@ public class MainViewModel : ViewModelBase
     public IReadOnlyList<ContextCountInfo> ContextCounts { get; private set; } = Array.Empty<ContextCountInfo>();
 
     private bool _isMeasurementFormVisible;
-    private string _bloodPressureInput = string.Empty;
-    private string _measurementError = string.Empty;
-    private MedicationTiming _medicationTiming = MedicationTiming.NotInformed;
-    private DateTime? _measurementDate = DateTime.Today;
-    private TimeSpan? _measurementTime = DateTime.Now.TimeOfDay;
-    private string _notes = string.Empty;
-    private string _heartRateInput = string.Empty;
-    private bool _atRest;
-    private string _selectedArm = "Não informado";
-    private string _selectedPosition = "Não informado";
     private readonly MeasurementRepository _measurementRepository = new();
     private readonly SettingsRepository _settingsRepository = new();
     private Patient? _selectedPatient;
@@ -102,67 +92,10 @@ public class MainViewModel : ViewModelBase
         }
     }
 
-    public string BloodPressureInput
-    {
-        get => _bloodPressureInput;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _bloodPressureInput, value);
-            MeasurementError = string.Empty;
-        }
-    }
-
-    public string MeasurementError
-    {
-        get => _measurementError;
-        private set => this.RaiseAndSetIfChanged(ref _measurementError, value);
-    }
-
-    public MedicationTiming MedicationTiming
-    {
-        get => _medicationTiming;
-        set => this.RaiseAndSetIfChanged(ref _medicationTiming, value);
-    }
-
-    public IReadOnlyList<string> MedicationOptions { get; } = new[]
-    {
-        "Não informado",
-        "Antes da medicação",
-        "Depois da medicação",
-        "Não se aplica"
-    };
-
-    public string SelectedMedicationOption
-    {
-        get => MedicationTiming switch
-        {
-            MedicationTiming.BeforeMedication => MedicationOptions[1],
-            MedicationTiming.AfterMedication => MedicationOptions[2],
-            MedicationTiming.NotApplicable => MedicationOptions[3],
-            _ => MedicationOptions[0]
-        };
-        set => MedicationTiming = value switch
-        {
-            "Antes da medicação" => MedicationTiming.BeforeMedication,
-            "Depois da medicação" => MedicationTiming.AfterMedication,
-            "Não se aplica" => MedicationTiming.NotApplicable,
-            _ => MedicationTiming.NotInformed
-        };
-    }
-
-    public DateTime? MeasurementDate { get => _measurementDate; set => this.RaiseAndSetIfChanged(ref _measurementDate, value); }
-    public TimeSpan? MeasurementTime { get => _measurementTime; set => this.RaiseAndSetIfChanged(ref _measurementTime, value); }
-    public string Notes { get => _notes; set => this.RaiseAndSetIfChanged(ref _notes, value); }
-    public string HeartRateInput { get => _heartRateInput; set { this.RaiseAndSetIfChanged(ref _heartRateInput, value); MeasurementError = string.Empty; } }
-    public bool AtRest { get => _atRest; set => this.RaiseAndSetIfChanged(ref _atRest, value); }
-    public IReadOnlyList<string> ArmOptions { get; } = new[] { "Não informado", "Direito", "Esquerdo" };
-    public IReadOnlyList<string> PositionOptions { get; } = new[] { "Não informado", "Sentado", "Deitado", "Em pé" };
-    public string SelectedArm { get => _selectedArm; set => this.RaiseAndSetIfChanged(ref _selectedArm, value); }
-    public string SelectedPosition { get => _selectedPosition; set => this.RaiseAndSetIfChanged(ref _selectedPosition, value); }
+    public MeasurementFormViewModel MeasurementForm { get; } = new();
     public SettingsViewModel Settings { get; } = new();
     public ObservableCollection<BloodPressureMeasurement> Measurements { get; } = new();
     public ObservableCollection<Patient> Patients { get; } = new();
-    public ObservableCollection<ContextOption> ContextOptions { get; } = new();
     public Patient? SelectedPatient
     {
         get => _selectedPatient;
@@ -188,7 +121,6 @@ public class MainViewModel : ViewModelBase
     public string PatientError => PatientForm.PatientError;
     public PatientFormViewModel PatientForm { get; } = new();
     public string ExportStatus { get => _exportStatus; private set => this.RaiseAndSetIfChanged(ref _exportStatus, value); }
-    public string MeasurementFormTitle => _editingMeasurement ? "Editar medição" : "Nova medição";
     public bool IsSettingsVisible
     {
         get => _isSettingsVisible;
@@ -289,29 +221,30 @@ public class MainViewModel : ViewModelBase
         ShowMeasurementFormCommand = ReactiveCommand.Create(() =>
         {
             _editingMeasurement = false;
-            BloodPressureInput = string.Empty;
-            Notes = string.Empty;
-            MeasurementDate = DateTime.Today;
-            MeasurementTime = DateTime.Now.TimeOfDay;
-            MedicationTiming = MedicationTiming.NotInformed;
-            HeartRateInput = string.Empty;
-            AtRest = false;
-            SelectedArm = "Não informado";
-            SelectedPosition = "Não informado";
-            SetContext(MeasurementContext.None);
-            this.RaisePropertyChanged(nameof(SelectedMedicationOption));
-            this.RaisePropertyChanged(nameof(MeasurementFormTitle));
+            MeasurementForm.IsEditMode = false;
+            MeasurementForm.BloodPressureInput = string.Empty;
+            MeasurementForm.Notes = string.Empty;
+            MeasurementForm.MeasurementDate = DateTime.Today;
+            MeasurementForm.MeasurementTime = DateTime.Now.TimeOfDay;
+            MeasurementForm.MedicationTiming = MedicationTiming.NotInformed;
+            MeasurementForm.HeartRateInput = string.Empty;
+            MeasurementForm.AtRest = false;
+            MeasurementForm.SelectedArm = "Não informado";
+            MeasurementForm.SelectedPosition = "Não informado";
+            MeasurementForm.SetContext(MeasurementContext.None);
+            MeasurementForm.MeasurementError = string.Empty;
             IsMeasurementFormVisible = true;
         });
         CancelMeasurementCommand = ReactiveCommand.Create(() =>
         {
             IsMeasurementFormVisible = false;
-            BloodPressureInput = string.Empty;
-            MeasurementError = string.Empty;
-            this.RaisePropertyChanged(nameof(MeasurementFormTitle));
+            MeasurementForm.BloodPressureInput = string.Empty;
+            MeasurementForm.MeasurementError = string.Empty;
         });
         SaveMeasurementCommand = ReactiveCommand.Create(SaveMeasurement);
         DeleteMeasurementCommand = ReactiveCommand.Create(DeleteSelectedMeasurement);
+        MeasurementForm.SaveRequested += SaveMeasurement;
+        MeasurementForm.CancelRequested += () => { IsMeasurementFormVisible = false; };
         EditMeasurementCommand = ReactiveCommand.Create(EditSelectedMeasurement);
         ShowPatientFormCommand = ReactiveCommand.Create(() => { PatientForm.IsEditMode = false; PatientForm.NewPatientName = string.Empty; PatientForm.PatientError = string.Empty; IsPatientFormVisible = true; });
         EditPatientCommand = ReactiveCommand.Create(EditPatient);
@@ -367,7 +300,6 @@ public class MainViewModel : ViewModelBase
         ExportPdfCommand = ReactiveCommand.CreateFromTask(ExportPdf);
         BackupCommand = ReactiveCommand.CreateFromTask(Backup);
         RestoreCommand = ReactiveCommand.CreateFromTask(Restore);
-        foreach (var option in MeasurementContextInfo.AllContexts) ContextOptions.Add(new ContextOption(option.Value, option.Label));
         LoadAppSettings();
         foreach (var patient in _measurementRepository.GetPatients()) Patients.Add(patient);
         SelectedPatient = Patients.FirstOrDefault();
@@ -394,24 +326,22 @@ public class MainViewModel : ViewModelBase
 
     private void SaveMeasurement()
     {
-        if (!BloodPressureParser.TryParse(BloodPressureInput, out var parsed, out var error))
+        if (!BloodPressureParser.TryParse(MeasurementForm.BloodPressureInput, out var parsed, out var error))
         {
-            MeasurementError = error ?? "Não foi possível interpretar a pressão.";
+            MeasurementForm.MeasurementError = error ?? "Não foi possível interpretar a pressão.";
             return;
         }
 
-        // Persistência será adicionada na próxima etapa; por enquanto o fluxo já valida
-        // e confirma a medição para preparar a integração com o histórico.
-        var measuredAt = (MeasurementDate ?? DateTime.Today).Date.Add(MeasurementTime ?? DateTime.Now.TimeOfDay);
+        var measuredAt = (MeasurementForm.MeasurementDate ?? DateTime.Today).Date.Add(MeasurementForm.MeasurementTime ?? DateTime.Now.TimeOfDay);
         int? heartRate = null;
-        var hrText = HeartRateInput?.Trim();
+        var hrText = MeasurementForm.HeartRateInput?.Trim();
         if (!string.IsNullOrEmpty(hrText))
         {
-            if (!int.TryParse(hrText, out var hr) || hr is < 20 or > 300) { MeasurementError = "Frequência cardíaca inválida (20 a 300)."; return; }
+            if (!int.TryParse(hrText, out var hr) || hr is < 20 or > 300) { MeasurementForm.MeasurementError = "Frequência cardíaca inválida (20 a 300)."; return; }
             heartRate = hr;
         }
-        var context = SelectedContext();
-        var measurement = new BloodPressureMeasurement(parsed!.Systolic, parsed.Diastolic, measuredAt, MedicationTiming, string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim(), context, heartRate, AtRest, ParseArm(), ParsePosition());
+        var context = MeasurementForm.SelectedContext();
+        var measurement = new BloodPressureMeasurement(parsed!.Systolic, parsed.Diastolic, measuredAt, MeasurementForm.MedicationTiming, string.IsNullOrWhiteSpace(MeasurementForm.Notes) ? null : MeasurementForm.Notes.Trim(), context, heartRate, MeasurementForm.AtRest, MeasurementForm.ParseArm(), MeasurementForm.ParsePosition());
         if (_editingMeasurement && SelectedMeasurement is { Id: > 0 } existing)
         {
             measurement = measurement with { Id = existing.Id };
@@ -419,19 +349,18 @@ public class MainViewModel : ViewModelBase
         }
         else
         {
-            if (SelectedPatient is null) { MeasurementError = "Cadastre ou selecione um paciente antes de salvar."; return; }
+            if (SelectedPatient is null) { MeasurementForm.MeasurementError = "Cadastre ou selecione um paciente antes de salvar."; return; }
             var id = _measurementRepository.Add(measurement, SelectedPatient.Id);
             measurement = measurement with { Id = id };
         }
         IsMeasurementFormVisible = false;
-        BloodPressureInput = measurement.Systolic / 10d + "/" + measurement.Diastolic / 10d;
-        MeasurementError = string.Empty;
-        Notes = string.Empty;
-        MeasurementDate = DateTime.Today;
-        MeasurementTime = DateTime.Now.TimeOfDay;
+        MeasurementForm.BloodPressureInput = measurement.Systolic / 10d + "/" + measurement.Diastolic / 10d;
+        MeasurementForm.MeasurementError = string.Empty;
+        MeasurementForm.Notes = string.Empty;
+        MeasurementForm.MeasurementDate = DateTime.Today;
+        MeasurementForm.MeasurementTime = DateTime.Now.TimeOfDay;
         SelectedMeasurement = null;
         _editingMeasurement = false;
-        this.RaisePropertyChanged(nameof(MeasurementFormTitle));
         ReloadMeasurements();
     }
 
@@ -637,18 +566,19 @@ public class MainViewModel : ViewModelBase
     {
         if (SelectedMeasurement is not { } measurement) return;
         _editingMeasurement = true;
-        BloodPressureInput = $"{measurement.Systolic}/{measurement.Diastolic}";
-        MeasurementDate = measurement.MeasuredAt.Date;
-        MeasurementTime = measurement.MeasuredAt.TimeOfDay;
-        MedicationTiming = measurement.MedicationTiming;
-        Notes = measurement.Notes ?? string.Empty;
-        HeartRateInput = measurement.HeartRate?.ToString() ?? string.Empty;
-        AtRest = measurement.AtRest;
-        SelectedArm = measurement.Arm switch { Arm.Right => "Direito", Arm.Left => "Esquerdo", _ => "Não informado" };
-        SelectedPosition = measurement.Position switch { BodyPosition.Seated => "Sentado", BodyPosition.Lying => "Deitado", BodyPosition.Standing => "Em pé", _ => "Não informado" };
-        SetContext(measurement.Context);
+        MeasurementForm.IsEditMode = true;
+        MeasurementForm.BloodPressureInput = $"{measurement.Systolic}/{measurement.Diastolic}";
+        MeasurementForm.MeasurementDate = measurement.MeasuredAt.Date;
+        MeasurementForm.MeasurementTime = measurement.MeasuredAt.TimeOfDay;
+        MeasurementForm.MedicationTiming = measurement.MedicationTiming;
+        MeasurementForm.Notes = measurement.Notes ?? string.Empty;
+        MeasurementForm.HeartRateInput = measurement.HeartRate?.ToString() ?? string.Empty;
+        MeasurementForm.AtRest = measurement.AtRest;
+        MeasurementForm.SelectedArm = measurement.Arm switch { Arm.Right => "Direito", Arm.Left => "Esquerdo", _ => "Não informado" };
+        MeasurementForm.SelectedPosition = measurement.Position switch { BodyPosition.Seated => "Sentado", BodyPosition.Lying => "Deitado", BodyPosition.Standing => "Em pé", _ => "Não informado" };
+        MeasurementForm.SetContext(measurement.Context);
+        MeasurementForm.MeasurementError = string.Empty;
         IsMeasurementFormVisible = true;
-        this.RaisePropertyChanged(nameof(MeasurementFormTitle));
     }
 
     private void ReloadMeasurements()
@@ -763,35 +693,6 @@ public class MainViewModel : ViewModelBase
         }
         return result;
     }
-
-    private MeasurementContext SelectedContext()
-    {
-        var result = MeasurementContext.None;
-        foreach (var option in ContextOptions)
-            if (option.IsSelected) result |= option.Context;
-        return result;
-    }
-
-    private void SetContext(MeasurementContext context)
-    {
-        foreach (var option in ContextOptions)
-            option.IsSelected = (context & option.Context) != 0;
-    }
-
-    private Arm ParseArm() => SelectedArm switch
-    {
-        "Direito" => Arm.Right,
-        "Esquerdo" => Arm.Left,
-        _ => Arm.NotInformed
-    };
-
-    private BodyPosition ParsePosition() => SelectedPosition switch
-    {
-        "Sentado" => BodyPosition.Seated,
-        "Deitado" => BodyPosition.Lying,
-        "Em pé" => BodyPosition.Standing,
-        _ => BodyPosition.NotInformed
-    };
 
     private void ReloadReminders()
     {
