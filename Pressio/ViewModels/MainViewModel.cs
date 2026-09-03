@@ -202,6 +202,7 @@ public class MainViewModel : ViewModelBase
     public Interaction<Unit, string?> OpenFileInteraction { get; } = new();
     public Interaction<Unit, string?> FolderPickerInteraction { get; } = new();
     public Interaction<Unit, Unit> SyncNowInteraction { get; } = new();
+    public Interaction<string, Unit> ShowMessageInteraction { get; } = new();
     public ReactiveCommand<Unit, Unit> EditPatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> DeletePatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ShowSettingsCommand { get; private set; } = null!;
@@ -344,7 +345,7 @@ public class MainViewModel : ViewModelBase
     private void SyncNow()
     {
         var dir = _settingsRepository.GetLastSyncDirectory();
-        if (string.IsNullOrWhiteSpace(dir)) { Settings.SyncStatus = "Escolha primeiro a pasta de sincronização."; return; }
+        if (string.IsNullOrWhiteSpace(dir)) { SetSyncError("Escolha primeiro a pasta de sincronização."); return; }
         _ = SyncNowInteraction.Handle(Unit.Default);
     }
 
@@ -358,10 +359,15 @@ public class MainViewModel : ViewModelBase
         ReloadMeasurements();
         ReloadReminders();
         RescheduleEnabledReminders();
+        _ = ShowMessageInteraction.Handle(Settings.SyncStatus);
         return _syncService.Serialize(merged);
     }
 
-    public void SetSyncError(string message) => Settings.SyncStatus = message;
+    public void SetSyncError(string message)
+    {
+        Settings.SyncStatus = message;
+        _ = ShowMessageInteraction.Handle(message);
+    }
 
     private void SaveMeasurement()
     {
