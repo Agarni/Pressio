@@ -4,7 +4,7 @@
              x:Class="Pressio.Views.PatientFormView"
              x:DataType="vm:PatientFormViewModel">
   <Grid RowDefinitions="*,Auto">
-    <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Disabled">
+    <ScrollViewer x:Name="FormScroll" Grid.Row="0" HorizontalScrollBarVisibility="Disabled">
       <StackPanel Spacing="14" Margin="20,16,20,16">
         <TextBlock Text="Crie ou atualize o perfil que terá suas próprias medições." FontSize="13" Foreground="{DynamicResource PressioMutedBrush}" TextWrapping="Wrap" />
         <TextBox x:Name="PatientNameInput" Text="{Binding NewPatientName}" PlaceholderText="Nome do paciente" />

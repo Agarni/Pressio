@@ -234,6 +234,7 @@ public class MainViewModel : ViewModelBase
             MeasurementForm.SetContext(MeasurementContext.None);
             MeasurementForm.MeasurementError = string.Empty;
             IsMeasurementFormVisible = true;
+            MeasurementForm.NotifyShown();
         });
         CancelMeasurementCommand = ReactiveCommand.Create(() =>
         {
@@ -246,7 +247,7 @@ public class MainViewModel : ViewModelBase
         MeasurementForm.SaveRequested += SaveMeasurement;
         MeasurementForm.CancelRequested += () => { IsMeasurementFormVisible = false; };
         EditMeasurementCommand = ReactiveCommand.Create(EditSelectedMeasurement);
-        ShowPatientFormCommand = ReactiveCommand.Create(() => { PatientForm.IsEditMode = false; PatientForm.NewPatientName = string.Empty; PatientForm.PatientError = string.Empty; IsPatientFormVisible = true; });
+        ShowPatientFormCommand = ReactiveCommand.Create(() => { PatientForm.IsEditMode = false; PatientForm.NewPatientName = string.Empty; PatientForm.PatientError = string.Empty; IsPatientFormVisible = true; PatientForm.NotifyShown(); });
         EditPatientCommand = ReactiveCommand.Create(EditPatient);
         PatientForm.SaveRequested += SavePatient;
         PatientForm.CancelRequested += () => { IsPatientFormVisible = false; };
@@ -526,6 +527,7 @@ public class MainViewModel : ViewModelBase
         PatientForm.NewPatientName = SelectedPatient.Name;
         PatientForm.PatientError = string.Empty;
         IsPatientFormVisible = true;
+        PatientForm.NotifyShown();
     }
 
     private void DeletePatient()
@@ -579,6 +581,7 @@ public class MainViewModel : ViewModelBase
         MeasurementForm.SetContext(measurement.Context);
         MeasurementForm.MeasurementError = string.Empty;
         IsMeasurementFormVisible = true;
+        MeasurementForm.NotifyShown();
     }
 
     private void ReloadMeasurements()

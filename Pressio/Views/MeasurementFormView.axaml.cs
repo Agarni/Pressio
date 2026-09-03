@@ -1,7 +1,6 @@
-using System;
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Pressio.ViewModels;
 
 namespace Pressio.Views;
 
@@ -10,14 +9,21 @@ public partial class MeasurementFormView : UserControl
     public MeasurementFormView()
     {
         InitializeComponent();
-        this.GetObservable(Visual.IsVisibleProperty).Subscribe(OnVisibilityChanged);
+        DataContextChanged += (_, _) =>
+        {
+            if (DataContext is MeasurementFormViewModel vm)
+                vm.Shown += OnShown;
+        };
     }
 
-    private void OnVisibilityChanged(bool isVisible)
+    private void OnShown()
     {
-        if (!isVisible)
-            return;
-        // Espera o controle entrar na árvore visual e ser renderizado antes de focar.
-        Dispatcher.UIThread.Post(() => PressureInput.Focus(), DispatcherPriority.Loaded);
+        // A cada abertura: volta ao topo e foca o campo de pressão
+        // (o ScrollViewer preserva o offset entre abrir/fechar).
+        Dispatcher.UIThread.Post(() =>
+        {
+            FormScroll.ScrollToHome();
+            PressureInput.Focus();
+        }, DispatcherPriority.Loaded);
     }
 }

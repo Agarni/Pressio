@@ -5,7 +5,7 @@
              x:Class="Pressio.Views.MeasurementFormView"
              x:DataType="vm:MeasurementFormViewModel">
   <Grid RowDefinitions="*,Auto">
-    <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Disabled">
+    <ScrollViewer x:Name="FormScroll" Grid.Row="0" HorizontalScrollBarVisibility="Disabled">
       <StackPanel Spacing="14" Margin="20,16,20,16">
         <TextBlock Text="Digite 13/8 ou 130/80. Você pode ajustar data e horário." FontSize="13" Foreground="{DynamicResource PressioMutedBrush}" TextWrapping="Wrap" />
         <TextBox x:Name="PressureInput" Text="{Binding BloodPressureInput}" PlaceholderText="Ex.: 13/8" FontSize="24" Padding="12" />

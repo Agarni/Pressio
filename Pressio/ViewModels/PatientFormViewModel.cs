@@ -14,6 +14,9 @@ public sealed class PatientFormViewModel : ViewModelBase
 
     public event Action? SaveRequested;
     public event Action? CancelRequested;
+    public event Action? Shown;
+
+    public void NotifyShown() => Shown?.Invoke();
 
     public ReactiveCommand<Unit, Unit> SaveCommand { get; }
     public ReactiveCommand<Unit, Unit> CancelCommand { get; }
