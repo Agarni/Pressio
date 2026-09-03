@@ -9,6 +9,10 @@
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
+    <!-- .NET for Android: o manifestmerger exige JDK 17+; usa o JDK 17 local quando presente.
+         Preciso ficar aqui no .csproj (não só no Directory.Build.props) porque o Rider compila
+         via um projeto temporário em /var/folders, que não importa o Directory.Build.props da raiz. -->
+    <JavaSdkDirectory Condition="'$(JavaSdkDirectory)' == '' and Exists('/Library/Java/JavaVirtualMachines/openjdk-17.jdk/Contents/Home')">/Library/Java/JavaVirtualMachines/openjdk-17.jdk/Contents/Home</JavaSdkDirectory>
   </PropertyGroup>
 
   <ItemGroup>

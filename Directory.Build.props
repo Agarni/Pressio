@@ -1,7 +1,0 @@
-<Project>
-  <PropertyGroup>
-    <!-- .NET for Android: o manifestmerger exige JDK 17+; usa o JDK 17 do sistema se existir,
-         senão deixa o SDK decidir (aplica só em builds Android; ignorado nos demais). -->
-    <JavaSdkDirectory Condition="'$(JavaSdkDirectory)' == '' and Exists('/Library/Java/JavaVirtualMachines/openjdk-17.jdk/Contents/Home')">/Library/Java/JavaVirtualMachines/openjdk-17.jdk/Contents/Home</JavaSdkDirectory>
-  </PropertyGroup>
-</Project>
