@@ -781,6 +781,21 @@ public class MainViewModel : ViewModelBase
         }
     }
 
+    // Fecha o overlay/página mais interno (usado pela navegação, ex.: botão voltar do Android).
+    // Retorna true se consumiu o evento; false quando não há o que fechar (a aplicação sai).
+    public bool HandleBack()
+    {
+        if (IsReminderNoticeVisible) { IsReminderNoticeVisible = false; return true; }
+        if (IsConfirmDialogVisible) { IsConfirmDialogVisible = false; return true; }
+        if (IsReminderFormVisible) { IsReminderFormVisible = false; return true; }
+        if (IsRemindersVisible) { IsRemindersVisible = false; return true; }
+        if (IsAboutVisible) { IsAboutVisible = false; return true; }
+        if (IsSettingsVisible) { IsSettingsVisible = false; return true; }
+        if (IsPatientFormVisible) { IsPatientFormVisible = false; return true; }
+        if (IsMeasurementFormVisible) { IsMeasurementFormVisible = false; return true; }
+        return false;
+    }
+
     private static ReminderDays NowToReminderDay(DayOfWeek day) => day switch
     {
         DayOfWeek.Sunday => ReminderDays.Sunday,

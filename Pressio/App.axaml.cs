@@ -10,6 +10,9 @@ namespace Pressio;
 
 public partial class App : Application
 {
+    /// <summary>ViewModel principal ativo (usado para navegação, ex.: botão voltar do Android).</summary>
+    public static MainViewModel? Main { get; private set; }
+
     public App()
     {
         Name = "Pressio";
@@ -48,20 +51,23 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            Main = new MainViewModel();
             desktop.MainWindow = new MainWindow
             {
-                DataContext = new MainViewModel()
+                DataContext = Main
             };
         }
         else if (ApplicationLifetime is IActivityApplicationLifetime singleViewFactoryApplicationLifetime)
         {
-            singleViewFactoryApplicationLifetime.MainViewFactory = () => new MainView { DataContext = new MainViewModel(isMobileLayout: true) };
+            Main = new MainViewModel(isMobileLayout: true);
+            singleViewFactoryApplicationLifetime.MainViewFactory = () => new MainView { DataContext = Main };
         }
         else if (ApplicationLifetime is ISingleViewApplicationLifetime singleViewPlatform)
         {
+            Main = new MainViewModel(isMobileLayout: true);
             singleViewPlatform.MainView = new MainView
             {
-                DataContext = new MainViewModel(isMobileLayout: true)
+                DataContext = Main
             };
         }
 
