@@ -53,6 +53,8 @@ public class MainViewModel : ViewModelBase
     private bool _isMeasurementFormVisible;
     private readonly MeasurementRepository _measurementRepository = new();
     private readonly SettingsRepository _settingsRepository = new();
+    private readonly ReminderRepository _reminderRepository = new();
+    private SyncService _syncService = null!;
     private Patient? _selectedPatient;
     private bool _isPatientFormVisible;
     private string _exportStatus = string.Empty;
@@ -72,7 +74,6 @@ public class MainViewModel : ViewModelBase
     private string _reportPeriod = "Todo o histórico";
     private DateTime? _reportStartDate = DateTime.Today.AddDays(-30);
     private DateTime? _reportEndDate = DateTime.Today;
-    private readonly ReminderRepository _reminderRepository = new();
     private bool _isRemindersVisible;
     private bool _isReminderFormVisible;
     private bool _editingReminder;
@@ -199,6 +200,7 @@ public class MainViewModel : ViewModelBase
     public Interaction<ExportFileRequest, string?> ExportFileInteraction { get; } = new();
     public Interaction<string, bool> ConfirmOpenInteraction { get; } = new();
     public Interaction<Unit, string?> OpenFileInteraction { get; } = new();
+    public Interaction<Unit, string?> FolderPickerInteraction { get; } = new();
     public ReactiveCommand<Unit, Unit> EditPatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> DeletePatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ShowSettingsCommand { get; private set; } = null!;
@@ -257,6 +259,9 @@ public class MainViewModel : ViewModelBase
         Settings.CancelRequested += () => { IsSettingsVisible = false; };
         Settings.BackupRequested += () => { _ = Backup(); };
         Settings.RestoreRequested += () => { _ = Restore(); };
+        Settings.ChooseDirectoryRequested += () => { _ = ChooseSyncDirectory(); };
+        Settings.SyncRequested += SyncNow;
+        _syncService = new SyncService(_measurementRepository, _reminderRepository, _settingsRepository, _settingsRepository.GetOrCreateSyncDeviceId());
         ShowAboutCommand = ReactiveCommand.Create(() => { _isAboutSplash = false; this.RaisePropertyChanged(nameof(IsAboutCloseVisible)); IsAboutVisible = true; });
         CloseAboutCommand = ReactiveCommand.Create(() => { IsAboutVisible = false; });
         CancelDeleteCommand = ReactiveCommand.Create(() => { IsConfirmDialogVisible = false; });
@@ -311,6 +316,7 @@ public class MainViewModel : ViewModelBase
         Settings.SelectedAppearance = _settingsRepository.GetAppearance();
         Settings.SelectedPrimaryColor = _settingsRepository.GetPrimaryColor();
         Settings.SelectedDisplayFormat = _settingsRepository.GetMeasurementDisplayFormat();
+        Settings.SyncDirectory = _settingsRepository.GetLastSyncDirectory() ?? string.Empty;
         BloodPressureMeasurement.UseShorthandFormat = Settings.SelectedDisplayFormat != "130/80";
         App.ApplyAppearance(Settings.SelectedAppearance, Settings.SelectedPrimaryColor);
     }
@@ -323,6 +329,33 @@ public class MainViewModel : ViewModelBase
         _settingsRepository.SaveMeasurementDisplayFormat(Settings.SelectedDisplayFormat);
         IsSettingsVisible = false;
         ReloadMeasurements();
+    }
+
+    private async Task ChooseSyncDirectory()
+    {
+        var dir = await FolderPickerInteraction.Handle(Unit.Default).FirstAsync();
+        if (string.IsNullOrWhiteSpace(dir)) return;
+        _settingsRepository.SaveLastSyncDirectory(dir);
+        Settings.SyncDirectory = dir;
+        Settings.SyncStatus = string.Empty;
+    }
+
+    private void SyncNow()
+    {
+        var dir = _settingsRepository.GetLastSyncDirectory();
+        if (string.IsNullOrWhiteSpace(dir)) { Settings.SyncStatus = "Escolha primeiro a pasta de sincronização."; return; }
+        try
+        {
+            var merged = _syncService.ImportFromFile(Path.Combine(dir, "pressio-sync.json"));
+            Settings.SyncStatus = $"Sincronizado às {DateTime.Now:HH:mm} — {merged.Patients.Count} pacientes, {merged.Measurements.Count} medições, {merged.Reminders.Count} lembretes.";
+            ReloadMeasurements();
+            ReloadReminders();
+            RescheduleEnabledReminders();
+        }
+        catch (Exception ex)
+        {
+            Settings.SyncStatus = "Falha ao sincronizar: " + ex.Message;
+        }
     }
 
     private void SaveMeasurement()

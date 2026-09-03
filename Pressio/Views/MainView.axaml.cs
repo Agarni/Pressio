@@ -77,5 +77,24 @@ public partial class MainView : UserControl
             });
             ctx.SetOutput(files.Count > 0 ? files[0].TryGetLocalPath() : null);
         });
+
+        vm.FolderPickerInteraction.RegisterHandler(async ctx =>
+        {
+            var provider = TopLevel.GetTopLevel(this)?.StorageProvider;
+            if (provider is null) { ctx.SetOutput(null); return; }
+            try
+            {
+                var folders = await provider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+                {
+                    Title = "Escolha a pasta de sincronização (OneDrive / Google Drive / iCloud)",
+                    AllowMultiple = false
+                });
+                ctx.SetOutput(folders.Count > 0 ? folders[0].TryGetLocalPath() : null);
+            }
+            catch
+            {
+                ctx.SetOutput(null);
+            }
+        });
     }
 }

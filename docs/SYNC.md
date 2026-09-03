@@ -203,7 +203,7 @@ Privacidade: dados de saúde são sensíveis — em nuvem, criptografe os payloa
 
 - [x] **Fase S1 — Fundação:** migração `SyncId`/`PatientSyncId`/`UpdatedAtUtc` + backfill; DTOs de snapshot; serialização de `pressio-sync.json` (com testes).
 - [x] **Fase S2 — Export/Import local:** `SyncService.Merge` (LWW por `syncId`/`updatedAt`, tie → local) + `Apply` no banco (upsert + tombstone `Deleted`); exportar/importar `.json` entre máquinas (testado). Exclusões locais viram **tombstone** (`Deleted=1`) para viajarem entre dispositivos.
-- [ ] **Fase S3 — Pasta de nuvem:** seletor de pasta + "Sincronizar agora" + resumo; persistir `LastSyncDirectory`.
+- [x] **Fase S3 — Pasta de nuvem (UI):** seletor de pasta nativo (`FolderPickerInteraction`, `FolderPickerOpenOptions`) + botão "Sincronizar agora" em **Configurações → Sincronização**; mescla, aplica e grava `pressio-sync.json` na pasta escolhida; persistência de `LastSyncDirectory`. *Nota: no desktop o seletor é o diálogo nativo de pasta; no Android a escolha de pasta de nuvem depende do seletor de documentos do sistema.*
 - [ ] **Fase S4 — Refinamentos:** auto-sync ao abrir o app (opcional); compactar tombstones; status/diagnóstico na tela "Sobre".
 
 > **Fases S1–S2 já entregam valor real** (transferência por arquivo) sem depender de cliente de nuvem para testar.
