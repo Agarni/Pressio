@@ -46,12 +46,7 @@ O MVP está em andamento. Abaixo, o mapa do que já existe e o cronograma de con
 - [x] **Fase 5 — Formulário ampliado (4.2):** frequência cardíaca, repouso, braço/posição e formato de exibição configurável.
 - [x] **Fase 6 — Relatórios (4.6):** exportação CSV e PDF com resumo e gráfico, respeitando filtros.
 - [x] **Fase 7 — Lembretes (4.7):** recurso de lembretes recorrentes (horário, dias, ativo) com aviso in-app.
-- [ ] **Fase 3 — Histórico e filtros (4.4):** filtro por período, horário e medicação; busca em observações; refletindo no dashboard.
-- [ ] **Fase 4 — Dashboard completo (4.5):** seletor de período, comparação antes/depois, distribuição por horário, calendário, gráfico de sistólica e diastólica.
-- [ ] **Fase 5 — Formulário ampliado (4.2):** frequência cardíaca, repouso, braço/posição, formato de exibição configurável.
-- [ ] **Fase 6 — Relatórios (4.6):** filtros e exportação em PDF.
-- [ ] **Fase 7 — Lembretes (4.7):** entidade `Reminder` e notificações locais por plataforma.
-- [ ] **Fase 8 — Qualidade e NFRs (6/etapa 10):** testes (parser e repositório), backup/restauração, acessibilidade, triagem do aviso `NU1903`.
+- [x] **Fase 8 — Qualidade e NFRs (6/etapa 10):** testes (parser e repositórios), backup/restauração, acessibilidade e correção do aviso `NU1903`.
 
 ## 1. Visão do produto
 

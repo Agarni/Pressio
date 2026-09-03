@@ -16,8 +16,12 @@
         <PackageVersion Include="Avalonia.Android" Version="12.0.5" />
         <PackageVersion Include="ReactiveUI.Avalonia" Version="11.3.8" />
         <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.2" />
+        <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.13" />
         <PackageVersion Include="SkiaSharp" Version="3.119.4" />
 
         <PackageVersion Include="Xamarin.AndroidX.Core.SplashScreen" Version="1.0.1.15" />
+        <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+        <PackageVersion Include="xunit" Version="2.9.2" />
+        <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
     </ItemGroup>
 </Project>

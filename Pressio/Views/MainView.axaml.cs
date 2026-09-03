@@ -64,5 +64,18 @@ public partial class MainView : UserControl
 
             ctx.SetOutput(await dialog.ShowDialog<bool>(owner));
         });
+
+        vm.OpenFileInteraction.RegisterHandler(async ctx =>
+        {
+            var provider = TopLevel.GetTopLevel(this)?.StorageProvider;
+            if (provider is null) { ctx.SetOutput(null); return; }
+            var files = await provider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Selecione o arquivo de backup (.db)",
+                AllowMultiple = false,
+                FileTypeFilter = new[] { new FilePickerFileType("Backup") { Patterns = new[] { "*.db" } } }
+            });
+            ctx.SetOutput(files.Count > 0 ? files[0].TryGetLocalPath() : null);
+        });
     }
 }

@@ -8,4 +8,5 @@
     <Deploy />
   </Project>
   <Project Path="Pressio/Pressio.csproj" />
+  <Project Path="Pressio.Tests/Pressio.Tests.csproj" />
 </Solution>

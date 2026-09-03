@@ -8,6 +8,7 @@ using System.Linq;
 using System.IO;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using Microsoft.Data.Sqlite;
 using Avalonia;
 using Avalonia.Media;
 using Pressio.Models;
@@ -283,8 +284,11 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> SavePatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ExportCsvCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ExportPdfCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> BackupCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> RestoreCommand { get; private set; } = null!;
     public Interaction<ExportFileRequest, string?> ExportFileInteraction { get; } = new();
     public Interaction<string, bool> ConfirmOpenInteraction { get; } = new();
+    public Interaction<Unit, string?> OpenFileInteraction { get; } = new();
     public ReactiveCommand<Unit, Unit> CancelPatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> EditPatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> DeletePatientCommand { get; private set; } = null!;
@@ -392,6 +396,8 @@ public class MainViewModel : ViewModelBase
         }
         ExportCsvCommand = ReactiveCommand.CreateFromTask(ExportCsv);
         ExportPdfCommand = ReactiveCommand.CreateFromTask(ExportPdf);
+        BackupCommand = ReactiveCommand.CreateFromTask(Backup);
+        RestoreCommand = ReactiveCommand.CreateFromTask(Restore);
         foreach (var option in MeasurementContextInfo.AllContexts) ContextOptions.Add(new ContextOption(option.Value, option.Label));
         LoadAppSettings();
         foreach (var patient in _measurementRepository.GetPatients()) Patients.Add(patient);
@@ -482,9 +488,55 @@ public class MainViewModel : ViewModelBase
         IsPatientFormVisible = false;
     }
 
-    private async Task ExportCsv()
+    private async Task Backup()
     {
-        if (SelectedPatient is null || Measurements.Count == 0) { ExportStatus = "Não há medições para exportar."; return; }
+        var path = await ExportFileInteraction.Handle(new ExportFileRequest($"pressio-backup-{DateTime.Now:yyyyMMdd-HHmmss}.db", ".db", "Backup", _settingsRepository.GetLastExportDirectory())).FirstAsync();
+        if (string.IsNullOrWhiteSpace(path)) { ExportStatus = "Backup cancelado."; return; }
+        try
+        {
+            if (File.Exists(path)) File.Delete(path);
+            using var connection = new SqliteConnection($"Data Source={PressioDatabase.Path}");
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = $"VACUUM INTO '{path.Replace("'", "''")}'";
+            command.ExecuteNonQuery();
+            _settingsRepository.SaveLastExportDirectory(Path.GetDirectoryName(path) ?? string.Empty);
+            ExportStatus = $"Backup criado em: {path}";
+        }
+        catch (Exception ex)
+        {
+            ExportStatus = "Não foi possível criar o backup: " + ex.Message;
+        }
+    }
+
+    private async Task Restore()
+    {
+        var path = await OpenFileInteraction.Handle(Unit.Default).FirstAsync();
+        if (string.IsNullOrWhiteSpace(path)) { ExportStatus = "Restauração cancelada."; return; }
+        try
+        {
+            File.Copy(path, PressioDatabase.Path, overwrite: true);
+            ReloadPatients();
+            ReloadMeasurements();
+            ReloadReminders();
+            LoadAppSettings();
+            ExportStatus = "Backup restaurado com sucesso.";
+        }
+        catch (Exception ex)
+        {
+            ExportStatus = "Não foi possível restaurar o backup: " + ex.Message;
+        }
+    }
+
+    private void ReloadPatients()
+    {
+        Patients.Clear();
+        foreach (var patient in _measurementRepository.GetPatients()) Patients.Add(patient);
+        SelectedPatient = Patients.FirstOrDefault();
+    }
+
+    private async Task ExportCsv()
+    {        if (SelectedPatient is null || Measurements.Count == 0) { ExportStatus = "Não há medições para exportar."; return; }
         var (report, truncated) = BuildReportSet();
         var path = await RequestExportPath("csv", "CSV");
         if (path is null) { ExportStatus = "Exportação cancelada."; return; }

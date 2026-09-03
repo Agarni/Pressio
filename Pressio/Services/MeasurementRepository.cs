@@ -10,11 +10,11 @@ public sealed class MeasurementRepository
 {
     private readonly string _connectionString;
 
-    public MeasurementRepository()
+    public MeasurementRepository(string? dbPath = null)
     {
-        var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Pressio");
-        Directory.CreateDirectory(directory);
-        _connectionString = new SqliteConnectionStringBuilder { DataSource = Path.Combine(directory, "pressio.db") }.ToString();
+        var dataSource = dbPath ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Pressio", "pressio.db");
+        Directory.CreateDirectory(Path.GetDirectoryName(dataSource)!);
+        _connectionString = new SqliteConnectionStringBuilder { DataSource = dataSource }.ToString();
         Initialize();
     }
 

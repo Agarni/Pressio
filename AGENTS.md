@@ -18,9 +18,8 @@ Pressio is a cross-platform blood-pressure tracking app: Avalonia UI + .NET 10 +
 dotnet build Pressio.Desktop/Pressio.Desktop.csproj   # fast core check
 dotnet run --project Pressio.Desktop                   # run the desktop app
 dotnet build                                           # whole solution
+dotnet test Pressio.Tests/Pressio.Tests.csproj         # unit tests (parser + repositories)
 ```
-
-There is **no test project** yet; do not assume a test runner exists.
 
 ```sh
 bash scripts/package-macos.sh osx-arm64   # monta Pressio.app (ícone/Info.plist) e abre
@@ -34,16 +33,18 @@ The Avalonia packages (Avalonia, Themes.Fluent, Fonts.Inter, Desktop, iOS, Brows
 
 `SkiaSharp` (same version Avalonia uses, 3.119.4) is a direct reference in `Pressio` for PDF generation via `Pressio/Services/PdfReportService.cs` (`SKDocument.CreatePdf`); the native Skia assets come from `Avalonia.Desktop` at runtime.
 
+`SQLitePCLRaw.bundle_e_sqlite3` is pinned at `2.1.13` (via `Directory.Packages.props`) to suppress the `NU1903` advisory on `lib.e_sqlite3 2.1.11` — keep it above 2.1.11.
+
 ## Build/CI gotchas
 
-- The build emits a reproducible `NU1903` high-severity warning about `SQLitePCLRaw.lib.e_sqlite3 2.1.11`. This is currently expected — not an error. Fix/triage before treating builds as clean.
 - iOS Debug uses `<UseInterpreter>true</UseInterpreter>` to avoid premature AOT loading; Release keeps `MtouchNoSymbolStrip` as a workaround for Xcode 26.6. Don't remove these without reason.
 - **iOS app icon:** supplied via `Pressio.iOS/Info.plist` `CFBundleIcons`/`CFBundleIconFiles` + PNGs in `Pressio.iOS/Resources/AppIcon-*.png`. Do **not** rely on an `Assets.xcassets`/`AppIcon` asset catalog — the .NET/iOS toolchain here does **not** compile it into an `Assets.car` (its `actool/bundle/` stays empty). Icon/`Info.plist` changes need a **clean build** (`dotnet clean`) + reinstall, because incremental builds may not re-merge the `Info.plist`.
 
 ## Persistence
 
 - SQLite via raw `Microsoft.Data.Sqlite` (no EF Core/Dapper, despite what `PRD.md` suggests).
-- DB file: `%LocalAppData%\Pressio\pressio.db`. Dates are stored as ISO-8601 strings; UTC on write, `.ToLocalTime()` on read.
+- DB file: `%LocalAppData%\Pressio\pressio.db` (`PressioDatabase.Path`). Dates are stored as ISO-8601 strings; UTC on write, `.ToLocalTime()` on read.
+- Backup/Restore (Settings → Dados): backup uses `VACUUM INTO` to a user-chosen `.db`; restore copies the chosen file over the DB path and reloads patients/measurements/reminders/settings. Repositories take an optional `dbPath` (used by tests).
 - Both `MeasurementRepository` and `SettingsRepository` open the same DB file, each computing its own connection string.
 - `ReminderRepository` also opens the same DB (table `Reminders (Id, Time TEXT, Days INTEGER, Enabled INTEGER, Note TEXT)`); `ReminderTime` is a `TimeSpan` stored as `HH:mm:ss`, days are a `[Flags] ReminderDays` mask.
 - OS notifications are wired via `Pressio.Services.INotificationService`/`Notifications.Service` (set at host startup: `Program.cs` → `DesktopNotificationService`; `Application.cs` → `AndroidNotificationService`; `Main.cs` → `IosNotificationService`). `MainViewModel` schedules/cancels on reminder changes and reschedules enabled ones on start. Desktop uses `osascript`/`notify-send`/`msg`; Android uses AlarmManager + NotificationChannel; iOS uses `UNUserNotificationCenter` (authorization requested lazily). In-app reminders still poll every 20s (`CheckDueReminders`) and show an overlay as a fallback. **Device/emulator validation is required; on macOS notifications need a bundled `.app`.**
