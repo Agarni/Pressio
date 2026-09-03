@@ -87,9 +87,6 @@ public class MainViewModel : ViewModelBase
     private bool _isReminderFormVisible;
     private bool _editingReminder;
     private ReminderItem? _selectedReminder;
-    private TimeSpan? _reminderTime;
-    private bool _reminderEnabled = true;
-    private string _reminderNote = string.Empty;
     private bool _isReminderNoticeVisible;
     private string _reminderNoticeMessage = string.Empty;
     private readonly HashSet<(long Id, DateTime Date)> _firedReminders = new();
@@ -241,7 +238,6 @@ public class MainViewModel : ViewModelBase
     public DateTime? ReportStartDate { get => _reportStartDate; set => this.RaiseAndSetIfChanged(ref _reportStartDate, value); }
     public DateTime? ReportEndDate { get => _reportEndDate; set => this.RaiseAndSetIfChanged(ref _reportEndDate, value); }
     public ObservableCollection<ReminderItem> Reminders { get; } = new();
-    public ObservableCollection<ReminderDayOption> ReminderDayOptions { get; } = new();
     public ReminderItem? SelectedReminder { get => _selectedReminder; set => this.RaiseAndSetIfChanged(ref _selectedReminder, value); }
     public bool IsRemindersVisible { get => _isRemindersVisible; private set { this.RaiseAndSetIfChanged(ref _isRemindersVisible, value); this.RaisePropertyChanged(nameof(IsRemindersDialogVisible)); this.RaisePropertyChanged(nameof(IsRemindersMobilePageVisible)); } }
     public bool IsRemindersDialogVisible => IsRemindersVisible && !IsMobileLayout;
@@ -253,9 +249,7 @@ public class MainViewModel : ViewModelBase
     }
     public bool IsReminderFormDialogVisible => IsReminderFormVisible && !IsMobileLayout;
     public bool IsReminderFormMobilePageVisible => IsReminderFormVisible && IsMobileLayout;
-    public TimeSpan? ReminderTime { get => _reminderTime; set => this.RaiseAndSetIfChanged(ref _reminderTime, value); }
-    public bool ReminderEnabled { get => _reminderEnabled; set => this.RaiseAndSetIfChanged(ref _reminderEnabled, value); }
-    public string ReminderNote { get => _reminderNote; set => this.RaiseAndSetIfChanged(ref _reminderNote, value); }
+    public ReminderFormViewModel ReminderForm { get; } = new();
     public bool IsReminderNoticeVisible { get => _isReminderNoticeVisible; private set => this.RaiseAndSetIfChanged(ref _isReminderNoticeVisible, value); }
     public string ReminderNoticeMessage { get => _reminderNoticeMessage; set => this.RaiseAndSetIfChanged(ref _reminderNoticeMessage, value); }
 
@@ -345,10 +339,11 @@ public class MainViewModel : ViewModelBase
         ShowReminderFormCommand = ReactiveCommand.Create(() =>
         {
             _editingReminder = false;
-            ReminderTime = DateTime.Now.TimeOfDay;
-            ReminderEnabled = true;
-            ReminderNote = string.Empty;
-            SetReminderDays(ReminderDays.All);
+            ReminderForm.IsEditMode = false;
+            ReminderForm.ReminderTime = DateTime.Now.TimeOfDay;
+            ReminderForm.ReminderEnabled = true;
+            ReminderForm.ReminderNote = string.Empty;
+            ReminderForm.SetDays(ReminderDays.All);
             IsReminderFormVisible = true;
         });
         CancelReminderFormCommand = ReactiveCommand.Create(() => { IsReminderFormVisible = false; });
@@ -356,7 +351,8 @@ public class MainViewModel : ViewModelBase
         EditReminderCommand = ReactiveCommand.Create(EditReminder);
         DeleteReminderCommand = ReactiveCommand.Create(DeleteSelectedReminder);
         DismissReminderNoticeCommand = ReactiveCommand.Create(() => { IsReminderNoticeVisible = false; });
-        foreach (var day in ReminderInfo.AllDays) ReminderDayOptions.Add(new ReminderDayOption(day.Value, day.Label));
+        ReminderForm.SaveRequested += SaveReminder;
+        ReminderForm.CancelRequested += () => { IsReminderFormVisible = false; };
         try { Observable.Interval(TimeSpan.FromSeconds(20), RxApp.MainThreadScheduler).Subscribe(_ => CheckDueReminders()); } catch { }
         RescheduleEnabledReminders();
         _isAboutSplash = false;
@@ -811,29 +807,15 @@ public class MainViewModel : ViewModelBase
         else _ = Notifications.Service.CancelAsync(item.Id);
     }
 
-    private ReminderDays SelectedDays()
-    {
-        var result = ReminderDays.None;
-        foreach (var option in ReminderDayOptions)
-            if (option.IsSelected) result |= option.Value;
-        return result;
-    }
-
-    private void SetReminderDays(ReminderDays days)
-    {
-        foreach (var option in ReminderDayOptions)
-            option.IsSelected = (days & option.Value) != 0;
-    }
-
     private void SaveReminder()
     {
-        var time = ReminderTime ?? DateTime.Now.TimeOfDay;
-        var days = SelectedDays();
+        var time = ReminderForm.ReminderTime ?? DateTime.Now.TimeOfDay;
+        var days = ReminderForm.SelectedDays();
         if (days == ReminderDays.None) days = ReminderDays.All;
-        var note = string.IsNullOrWhiteSpace(ReminderNote) ? null : ReminderNote.Trim();
+        var note = string.IsNullOrWhiteSpace(ReminderForm.ReminderNote) ? null : ReminderForm.ReminderNote.Trim();
         if (_editingReminder && SelectedReminder is { } selected)
         {
-            var updated = new Reminder(selected.Id, time, days, ReminderEnabled, note);
+            var updated = new Reminder(selected.Id, time, days, ReminderForm.ReminderEnabled, note);
             _reminderRepository.Update(updated);
             var index = Reminders.IndexOf(selected);
             Reminders[index] = new ReminderItem(updated, PersistReminderEnabled);
@@ -842,8 +824,8 @@ public class MainViewModel : ViewModelBase
         }
         else
         {
-            var id = _reminderRepository.Add(new Reminder(0, time, days, ReminderEnabled, note));
-            var reminder = new Reminder(id, time, days, ReminderEnabled, note);
+            var id = _reminderRepository.Add(new Reminder(0, time, days, ReminderForm.ReminderEnabled, note));
+            var reminder = new Reminder(id, time, days, ReminderForm.ReminderEnabled, note);
             var item = new ReminderItem(reminder, PersistReminderEnabled);
             Reminders.Add(item);
             SelectedReminder = item;
@@ -856,10 +838,11 @@ public class MainViewModel : ViewModelBase
     {
         if (SelectedReminder is not { } item) return;
         _editingReminder = true;
-        ReminderTime = item.Time;
-        ReminderEnabled = item.Enabled;
-        ReminderNote = item.Note ?? string.Empty;
-        SetReminderDays(item.Days);
+        ReminderForm.IsEditMode = true;
+        ReminderForm.ReminderTime = item.Time;
+        ReminderForm.ReminderEnabled = item.Enabled;
+        ReminderForm.ReminderNote = item.Note ?? string.Empty;
+        ReminderForm.SetDays(item.Days);
         IsReminderFormVisible = true;
     }
 

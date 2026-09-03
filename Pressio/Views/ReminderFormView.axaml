@@ -1,0 +1,14 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Pressio.ViewModels"
+             xmlns:m="using:Pressio.Models"
+             x:Class="Pressio.Views.ReminderFormView"
+             x:DataType="vm:ReminderFormViewModel">
+  <StackPanel Spacing="14">
+    <StackPanel Spacing="5"><TextBlock Text="Horário" FontSize="12" FontWeight="SemiBold" /><TimePicker SelectedTime="{Binding ReminderTime}" ClockIdentifier="24HourClock" /></StackPanel>
+    <StackPanel Spacing="6"><TextBlock Text="Dias da semana" FontSize="12" FontWeight="SemiBold" /><ItemsControl ItemsSource="{Binding ReminderDayOptions}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate x:DataType="m:ReminderDayOption"><ToggleButton Classes="toggle-chip" IsChecked="{Binding IsSelected}" Content="{Binding Label}" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></StackPanel>
+    <CheckBox Content="Lembrete ativo" IsChecked="{Binding ReminderEnabled}" Foreground="{DynamicResource PressioTextBrush}" />
+    <TextBox Text="{Binding ReminderNote}" PlaceholderText="Observação (opcional)" />
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8"><Button Classes="secondary-button" Content="Cancelar" Command="{Binding CancelCommand}" /><Button Classes="primary-button" Content="Salvar lembrete" Command="{Binding SaveCommand}" /></StackPanel>
+  </StackPanel>
+</UserControl>
