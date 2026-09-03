@@ -71,9 +71,6 @@ public class MainViewModel : ViewModelBase
     private bool _isSettingsVisible;
     private bool _isAboutVisible;
     private bool _isAboutSplash = true;
-    private string _selectedAppearance = "Claro";
-    private string _selectedPrimaryColor = "Índigo";
-    private string _selectedDisplayFormat = "13/8";
     private bool _isConfirmDialogVisible;
     private string _confirmMessage = string.Empty;
     private ConfirmationAction _pendingConfirmation;
@@ -165,8 +162,7 @@ public class MainViewModel : ViewModelBase
     public IReadOnlyList<string> PositionOptions { get; } = new[] { "Não informado", "Sentado", "Deitado", "Em pé" };
     public string SelectedArm { get => _selectedArm; set => this.RaiseAndSetIfChanged(ref _selectedArm, value); }
     public string SelectedPosition { get => _selectedPosition; set => this.RaiseAndSetIfChanged(ref _selectedPosition, value); }
-    public IReadOnlyList<string> MeasurementDisplayFormatOptions { get; } = new[] { "13/8", "130/80" };
-    public string SelectedDisplayFormat { get => _selectedDisplayFormat; set => this.RaiseAndSetIfChanged(ref _selectedDisplayFormat, value); }
+    public SettingsViewModel Settings { get; } = new();
     public ObservableCollection<BloodPressureMeasurement> Measurements { get; } = new();
     public ObservableCollection<Patient> Patients { get; } = new();
     public ObservableCollection<ContextOption> ContextOptions { get; } = new();
@@ -210,14 +206,6 @@ public class MainViewModel : ViewModelBase
     public bool IsAboutDialogVisible => IsAboutVisible && !IsMobileLayout;
     public bool IsAboutMobilePageVisible => IsAboutVisible && IsMobileLayout;
     public bool IsAboutCloseVisible => !_isAboutSplash;
-    public IReadOnlyList<string> AppearanceOptions { get; } = new[] { "Claro", "Escuro" };
-    public IReadOnlyList<string> PrimaryColorOptions { get; } = new[] { "Índigo", "Azul", "Verde", "Roxo", "Coral" };
-    public string SelectedAppearance
-    {
-        get => _selectedAppearance;
-        set => this.RaiseAndSetIfChanged(ref _selectedAppearance, value);
-    }
-    public string SelectedPrimaryColor { get => _selectedPrimaryColor; set => this.RaiseAndSetIfChanged(ref _selectedPrimaryColor, value); }
     public bool IsConfirmDialogVisible { get => _isConfirmDialogVisible; private set => this.RaiseAndSetIfChanged(ref _isConfirmDialogVisible, value); }
     public string ConfirmMessage { get => _confirmMessage; private set => this.RaiseAndSetIfChanged(ref _confirmMessage, value); }
     public IReadOnlyList<string> FilterPeriodOptions { get; } = new[] { "Todo o histórico", "Hoje", "Últimos 7 dias", "Últimos 30 dias" };
@@ -288,9 +276,6 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> EditPatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> DeletePatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ShowSettingsCommand { get; private set; } = null!;
-    public ReactiveCommand<Unit, Unit> SaveSettingsCommand { get; private set; } = null!;
-    public ReactiveCommand<Unit, Unit> CloseSettingsCommand { get; private set; } = null!;
-    public ReactiveCommand<string, Unit> SelectPrimaryColorCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ShowAboutCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> CloseAboutCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ConfirmDeleteCommand { get; private set; } = null!;
@@ -340,17 +325,10 @@ public class MainViewModel : ViewModelBase
         PatientForm.CancelRequested += () => { IsPatientFormVisible = false; };
         DeletePatientCommand = ReactiveCommand.Create(DeletePatient);
         ShowSettingsCommand = ReactiveCommand.Create(() => { IsSettingsVisible = true; });
-        SaveSettingsCommand = ReactiveCommand.Create(() =>
-        {
-            App.ApplyAppearance(SelectedAppearance, SelectedPrimaryColor);
-            _settingsRepository.SaveAppearance(SelectedAppearance, SelectedPrimaryColor);
-            BloodPressureMeasurement.UseShorthandFormat = SelectedDisplayFormat != "130/80";
-            _settingsRepository.SaveMeasurementDisplayFormat(SelectedDisplayFormat);
-            IsSettingsVisible = false;
-            ReloadMeasurements();
-        });
-        CloseSettingsCommand = ReactiveCommand.Create(() => { IsSettingsVisible = false; });
-        SelectPrimaryColorCommand = ReactiveCommand.Create<string>(color => SelectedPrimaryColor = color);
+        Settings.ApplyRequested += ApplySettings;
+        Settings.CancelRequested += () => { IsSettingsVisible = false; };
+        Settings.BackupRequested += () => { _ = Backup(); };
+        Settings.RestoreRequested += () => { _ = Restore(); };
         ShowAboutCommand = ReactiveCommand.Create(() => { _isAboutSplash = false; this.RaisePropertyChanged(nameof(IsAboutCloseVisible)); IsAboutVisible = true; });
         CloseAboutCommand = ReactiveCommand.Create(() => { IsAboutVisible = false; });
         CancelDeleteCommand = ReactiveCommand.Create(() => { IsConfirmDialogVisible = false; });
@@ -401,14 +379,21 @@ public class MainViewModel : ViewModelBase
 
     private void LoadAppSettings()
     {
-        _selectedAppearance = _settingsRepository.GetAppearance();
-        _selectedPrimaryColor = _settingsRepository.GetPrimaryColor();
-        _selectedDisplayFormat = _settingsRepository.GetMeasurementDisplayFormat();
-        BloodPressureMeasurement.UseShorthandFormat = _selectedDisplayFormat != "130/80";
-        this.RaisePropertyChanged(nameof(SelectedAppearance));
-        this.RaisePropertyChanged(nameof(SelectedPrimaryColor));
-        this.RaisePropertyChanged(nameof(SelectedDisplayFormat));
-        App.ApplyAppearance(_selectedAppearance, _selectedPrimaryColor);
+        Settings.SelectedAppearance = _settingsRepository.GetAppearance();
+        Settings.SelectedPrimaryColor = _settingsRepository.GetPrimaryColor();
+        Settings.SelectedDisplayFormat = _settingsRepository.GetMeasurementDisplayFormat();
+        BloodPressureMeasurement.UseShorthandFormat = Settings.SelectedDisplayFormat != "130/80";
+        App.ApplyAppearance(Settings.SelectedAppearance, Settings.SelectedPrimaryColor);
+    }
+
+    private void ApplySettings()
+    {
+        App.ApplyAppearance(Settings.SelectedAppearance, Settings.SelectedPrimaryColor);
+        _settingsRepository.SaveAppearance(Settings.SelectedAppearance, Settings.SelectedPrimaryColor);
+        BloodPressureMeasurement.UseShorthandFormat = Settings.SelectedDisplayFormat != "130/80";
+        _settingsRepository.SaveMeasurementDisplayFormat(Settings.SelectedDisplayFormat);
+        IsSettingsVisible = false;
+        ReloadMeasurements();
     }
 
     private void SaveMeasurement()
@@ -486,7 +471,7 @@ public class MainViewModel : ViewModelBase
     private async Task Backup()
     {
         var path = await ExportFileInteraction.Handle(new ExportFileRequest($"pressio-backup-{DateTime.Now:yyyyMMdd-HHmmss}.db", ".db", "Backup", _settingsRepository.GetLastExportDirectory())).FirstAsync();
-        if (string.IsNullOrWhiteSpace(path)) { ExportStatus = "Backup cancelado."; return; }
+        if (string.IsNullOrWhiteSpace(path)) { Settings.ExportStatus = "Backup cancelado."; return; }
         try
         {
             if (File.Exists(path)) File.Delete(path);
@@ -500,14 +485,14 @@ public class MainViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ExportStatus = "Não foi possível criar o backup: " + ex.Message;
+            Settings.ExportStatus = "Não foi possível criar o backup: " + ex.Message;
         }
     }
 
     private async Task Restore()
     {
         var path = await OpenFileInteraction.Handle(Unit.Default).FirstAsync();
-        if (string.IsNullOrWhiteSpace(path)) { ExportStatus = "Restauração cancelada."; return; }
+        if (string.IsNullOrWhiteSpace(path)) { Settings.ExportStatus = "Restauração cancelada."; return; }
         try
         {
             File.Copy(path, PressioDatabase.Path, overwrite: true);
@@ -515,11 +500,11 @@ public class MainViewModel : ViewModelBase
             ReloadMeasurements();
             ReloadReminders();
             LoadAppSettings();
-            ExportStatus = "Backup restaurado com sucesso.";
+            Settings.ExportStatus = "Backup restaurado com sucesso.";
         }
         catch (Exception ex)
         {
-            ExportStatus = "Não foi possível restaurar o backup: " + ex.Message;
+            Settings.ExportStatus = "Não foi possível restaurar o backup: " + ex.Message;
         }
     }
 
