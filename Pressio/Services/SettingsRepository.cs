@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Microsoft.Data.Sqlite;
+using Pressio.Models.Sync;
 
 namespace Pressio.Services;
 
@@ -41,10 +43,36 @@ public sealed class SettingsRepository
     {
         using var connection = Open();
         using var command = connection.CreateCommand();
-        command.CommandText = "INSERT OR REPLACE INTO Settings (Key, Value) VALUES ($key, $value)";
+        command.CommandText = "INSERT OR REPLACE INTO Settings (Key, Value, UpdatedAtUtc) VALUES ($key, $value, $updatedAt)";
         command.Parameters.AddWithValue("$key", key);
         command.Parameters.AddWithValue("$value", value);
+        command.Parameters.AddWithValue("$updatedAt", DateTime.UtcNow.ToString("O"));
         command.ExecuteNonQuery();
+    }
+
+    public Dictionary<string, SyncSetting> GetSyncSettings()
+    {
+        using var connection = Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Key, Value, UpdatedAtUtc FROM Settings";
+        using var reader = command.ExecuteReader();
+        var result = new Dictionary<string, SyncSetting>();
+        while (reader.Read())
+            result[reader.GetString(0)] = new SyncSetting
+            {
+                Value = reader.GetString(1),
+                UpdatedAt = reader.IsDBNull(2) ? DateTimeOffset.UtcNow : DateTimeOffset.Parse(reader.GetString(2), System.Globalization.CultureInfo.InvariantCulture)
+            };
+        return result;
+    }
+
+    public string GetOrCreateSyncDeviceId()
+    {
+        var existing = Get("SyncDeviceId", string.Empty);
+        if (existing.Length > 0) return existing;
+        var id = Guid.NewGuid().ToString("D");
+        Set("SyncDeviceId", id);
+        return id;
     }
 
     private SqliteConnection Open() { var connection = new SqliteConnection(_connectionString); connection.Open(); return connection; }
@@ -55,5 +83,11 @@ public sealed class SettingsRepository
         using var command = connection.CreateCommand();
         command.CommandText = "CREATE TABLE IF NOT EXISTS Settings (Key TEXT PRIMARY KEY, Value TEXT)";
         command.ExecuteNonQuery();
+        var found = false;
+        using var schema = connection.CreateCommand();
+        schema.CommandText = "PRAGMA table_info(Settings);";
+        using var reader = schema.ExecuteReader();
+        while (reader.Read()) if (reader.GetString(1) == "UpdatedAtUtc") { found = true; break; }
+        if (!found) { using var alter = connection.CreateCommand(); alter.CommandText = "ALTER TABLE Settings ADD COLUMN UpdatedAtUtc TEXT NULL"; alter.ExecuteNonQuery(); }
     }
 }

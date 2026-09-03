@@ -157,9 +157,51 @@ O banco local continua 100% funcional offline; a UI não depende de rede.
 
 ---
 
-## 9. Plano de implementação (fases)
+## 10. Transporte: pasta local vs. nuvem gratuita (mesmo motor)
 
-- **Fase S1 — Fundação:** migração `SyncId`/`PatientSyncId` + backfill; DTOs de snapshot; serialização de `pressio-sync.json` (com testes).
+O motor de sincronia (`SyncService` + `SyncStore`) é **independente do transporte**. O transporte apenas **lê/grava o snapshot** (referenciado como "arquivo" na seção 3). Hoje o transporte é a **pasta de nuvem**; amanhã pode ser um **back-end REST** sem redesenhar nada.
+
+```
+SyncService (mescla LWW por syncId/updatedAt)
+        │
+        ▼
+SyncTransport (interface)
+   ├─ FileSyncTransport   -> pressio-sync.json numa pasta local/nuvem (manual)   ← atual
+   ├─ CloudSyncTransport  -> REST para Supabase/Turso (delta + realtime)          ← futuro
+   └─ Backend own         -> API própria                                          ← futuro
+```
+
+### Opções de nuvem gratuita (sem servidor seu)
+
+> **Verifique os limites atuais** (mudam com o tempo). Todos os valores abaixo são aproximados do plano free.
+
+| Opção | Modelo | Grátis (aprox.) | Tempo real | Migração de dados | Ajuste |
+|---|---|---|---|---|---|
+| **Turso** (SQLite/libSQL) | SQL | ~9 GB / 500 DBs | não nativo (poll/manual) | nenhuma (é SQLite) | 🟢 ótimo |
+| **Supabase** (Postgres) | SQL + Auth + realtime | ~500 MB / 30k MAU | **sim** (websockets) | SQL→Postgres (leve) | 🟢 ótimo |
+| **Firebase Firestore** | NoSQL + realtime | 1 GiB / 50k leituras·dia | **sim** | NoSQL (reforma) | 🟡 (SDK desktop fraco) |
+| **Cloudflare D1** | SQLite (edge) | 5 GB / 5M leituras·dia | não nativo | nenhuma | 🟡 (precisa Worker) |
+| **MongoDB Atlas M0** | NoSQL + Device Sync | 512 MB | sim | NoSQL | 🟡 (Realm em manutenção) |
+
+- **Turso** — menor atrito: o banco remoto é SQLite (as migrações `syncId` valem iguais), cliente `Turso.Client`/`libsql`/REST. Grátis generoso. Contra: sem realtime nativo (sync manual ou ao abrir).
+- **Supabase** — mais recursos: Postgres + **Auth pronto** (magic link, Google/Apple) + **Realtime** (mudanças chegam em segundos). Grátis generoso. Contra: o plano free **pausa** o projeto após ~7 dias sem uso; pequena migração SQL→Postgres.
+
+### Central para o seu caso (offline-first)
+
+Mantenha o **SQLite local como fonte de verdade** e faça **sync delta** por `updatedAt`/`syncId`:
+
+```
+[dispositivo] --SyncService (LWW por registro)--> transporte
+   linha do tempo:  (1) pasta (2) REST Turso/Supabase (3) backend próprio
+```
+
+Privacidade: dados de saúde são sensíveis — em nuvem, criptografe os payloads (ou confie no TLS + auth). No modo pasta você já confia no cliente de nuvem.
+
+---
+
+## 11. Plano de implementação (fases)
+
+- **Fase S1 — Fundação:** migração `SyncId`/`PatientSyncId`/`UpdatedAtUtc` + backfill; DTOs de snapshot; serialização de `pressio-sync.json` (com testes).
 - **Fase S2 — Export/Import local:** exportar o snapshot para um `.json` e importá-lo (merge) — já dá para "levar" dados entre máquinas manualmente.
 - **Fase S3 — Pasta de nuvem:** seletor de pasta + "Sincronizar agora" + resumo; persistir `LastSyncDirectory`.
 - **Fase S4 — Refinamentos:** auto-sync ao abrir o app (opcional); compactar tombstones; status/diagnóstico na tela "Sobre".
@@ -168,6 +210,6 @@ O banco local continua 100% funcional offline; a UI não depende de rede.
 
 ---
 
-## 10. Caminho futuro (quando houver servidor)
+## 12. Caminho futuro (quando houver servidor)
 
-Evoluir a mesma semântica para um backend REST (`GET/PUT /measurements?updatedAfter=...`), mantendo `syncId`/`updatedAt` como chave de sincronia e *delta sync*. Assim o modo arquivo vira apenas um "transport" alternativo, sem redesenhar o modelo.
+Reaproveitar o mesmo modelo para um backend REST (`GET/PUT /measurements?updatedAfter=...`), mantendo `syncId`/`updatedAt` como chave de sincronia e *delta sync*. O modo arquivo vira apenas um `SyncTransport` alternativo — o motor continua.

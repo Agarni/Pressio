@@ -11,7 +11,7 @@ Meta: usar o app no celular **e** no computador com os mesmos dados, **sem servi
 
 Como hoje **não há infraestrutura de servidor**, a estratégia recomendada é **sincronização por arquivo numa pasta de nuvem** (OneDrive / Google Drive / iCloud), em **modo manual**. O usuário escolhe uma pasta compartilhada em cada dispositivo e clica em "Sincronizar".
 
-Leia o design técnico completo: **[docs/SYNC.md](SYNC.md)**.
+Leia o design técnico completo: **[docs/SYNC.md](SYNC.md)** (inclui a abstração de transporte e as opções de nuvem gratuita — Supabase/Turso — quando o usuário quiser tempo real).
 
 Alternativas sem servidor (candidatas, da mais simples à mais robusta):
 
@@ -21,7 +21,7 @@ Alternativas sem servidor (candidatas, da mais simples à mais robusta):
 | **Pasta compartilhada de rede (LAN)** | Sem conta de nuvem | Só funciona na mesma rede | 🟡 |
 | **Exportar/Importar `.json` (arquivo avulso)** | Simples, funciona com qualquer artefato | Totalmente manual | 🟢 |
 | **WebDAV (Nextcloud/Dropbox via URL)** | Disparado por URL | Exige conta/pasta compatível | 🟡 |
-| **Nuvem gratuita (Supabase/Firestore/Turso free tier)** | Tempo real + multi-dispositivo | Dependência externa, limites | 🔴 |
+| **Supabase / Turso (free tier)** | Tempo real + multi-dispositivo automático | Dependência externa, limites | 🔴 |
 
 ---
 
