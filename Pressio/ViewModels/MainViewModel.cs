@@ -65,10 +65,7 @@ public class MainViewModel : ViewModelBase
     private readonly SettingsRepository _settingsRepository = new();
     private Patient? _selectedPatient;
     private bool _isPatientFormVisible;
-    private string _newPatientName = string.Empty;
-    private string _patientError = string.Empty;
     private string _exportStatus = string.Empty;
-    private bool _editingPatient;
     private BloodPressureMeasurement? _selectedMeasurement;
     private bool _editingMeasurement;
     private bool _isSettingsVisible;
@@ -194,11 +191,11 @@ public class MainViewModel : ViewModelBase
             this.RaisePropertyChanged(nameof(IsPatientMobilePageVisible));
         }
     }
-    public string NewPatientName { get => _newPatientName; set { this.RaiseAndSetIfChanged(ref _newPatientName, value); PatientError = string.Empty; } }
-    public string PatientError { get => _patientError; private set => this.RaiseAndSetIfChanged(ref _patientError, value); }
+    public string NewPatientName => PatientForm.NewPatientName;
+    public string PatientError => PatientForm.PatientError;
+    public PatientFormViewModel PatientForm { get; } = new();
     public string ExportStatus { get => _exportStatus; private set => this.RaiseAndSetIfChanged(ref _exportStatus, value); }
     public string MeasurementFormTitle => _editingMeasurement ? "Editar medição" : "Nova medição";
-    public string PatientFormTitle => _editingPatient ? "Editar paciente" : "Novo paciente";
     public bool IsSettingsVisible
     {
         get => _isSettingsVisible;
@@ -281,7 +278,6 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> DeleteMeasurementCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> EditMeasurementCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ShowPatientFormCommand { get; private set; } = null!;
-    public ReactiveCommand<Unit, Unit> SavePatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ExportCsvCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ExportPdfCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> BackupCommand { get; private set; } = null!;
@@ -289,7 +285,6 @@ public class MainViewModel : ViewModelBase
     public Interaction<ExportFileRequest, string?> ExportFileInteraction { get; } = new();
     public Interaction<string, bool> ConfirmOpenInteraction { get; } = new();
     public Interaction<Unit, string?> OpenFileInteraction { get; } = new();
-    public ReactiveCommand<Unit, Unit> CancelPatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> EditPatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> DeletePatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ShowSettingsCommand { get; private set; } = null!;
@@ -339,10 +334,10 @@ public class MainViewModel : ViewModelBase
         SaveMeasurementCommand = ReactiveCommand.Create(SaveMeasurement);
         DeleteMeasurementCommand = ReactiveCommand.Create(DeleteSelectedMeasurement);
         EditMeasurementCommand = ReactiveCommand.Create(EditSelectedMeasurement);
-        ShowPatientFormCommand = ReactiveCommand.Create(() => { _editingPatient = false; NewPatientName = string.Empty; IsPatientFormVisible = true; this.RaisePropertyChanged(nameof(PatientFormTitle)); });
-        SavePatientCommand = ReactiveCommand.Create(SavePatient);
-        CancelPatientCommand = ReactiveCommand.Create(() => { IsPatientFormVisible = false; NewPatientName = string.Empty; PatientError = string.Empty; });
+        ShowPatientFormCommand = ReactiveCommand.Create(() => { PatientForm.IsEditMode = false; PatientForm.NewPatientName = string.Empty; PatientForm.PatientError = string.Empty; IsPatientFormVisible = true; });
         EditPatientCommand = ReactiveCommand.Create(EditPatient);
+        PatientForm.SaveRequested += SavePatient;
+        PatientForm.CancelRequested += () => { IsPatientFormVisible = false; };
         DeletePatientCommand = ReactiveCommand.Create(DeletePatient);
         ShowSettingsCommand = ReactiveCommand.Create(() => { IsSettingsVisible = true; });
         SaveSettingsCommand = ReactiveCommand.Create(() =>
@@ -469,9 +464,9 @@ public class MainViewModel : ViewModelBase
 
     private void SavePatient()
     {
-        if (string.IsNullOrWhiteSpace(NewPatientName)) { PatientError = "Informe o nome do paciente."; return; }
-        var name = NewPatientName.Trim();
-        if (_editingPatient && SelectedPatient is { } selected)
+        if (string.IsNullOrWhiteSpace(PatientForm.NewPatientName)) { PatientForm.PatientError = "Informe o nome do paciente."; return; }
+        var name = PatientForm.NewPatientName.Trim();
+        if (PatientForm.IsEditMode && SelectedPatient is { } selected)
         {
             var updated = selected with { Name = name };
             _measurementRepository.UpdatePatient(updated);
@@ -617,16 +612,16 @@ public class MainViewModel : ViewModelBase
     private void EditPatient()
     {
         if (SelectedPatient is null) return;
-        _editingPatient = true;
-        NewPatientName = SelectedPatient.Name;
+        PatientForm.IsEditMode = true;
+        PatientForm.NewPatientName = SelectedPatient.Name;
+        PatientForm.PatientError = string.Empty;
         IsPatientFormVisible = true;
-        this.RaisePropertyChanged(nameof(PatientFormTitle));
     }
 
     private void DeletePatient()
     {
-        if (SelectedPatient is null || Patients.Count <= 1) { PatientError = "Mantenha ao menos um paciente cadastrado."; return; }
-        PatientError = string.Empty;
+        if (SelectedPatient is null || Patients.Count <= 1) { PatientForm.PatientError = "Mantenha ao menos um paciente cadastrado."; return; }
+        PatientForm.PatientError = string.Empty;
         _pendingConfirmation = ConfirmationAction.DeletePatient;
         ConfirmMessage = $"Excluir o paciente \"{SelectedPatient.Name}\" e todas as suas medições?";
         IsConfirmDialogVisible = true;

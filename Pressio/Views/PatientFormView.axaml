@@ -1,0 +1,15 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Pressio.ViewModels"
+             x:Class="Pressio.Views.PatientFormView"
+             x:DataType="vm:PatientFormViewModel">
+  <StackPanel Spacing="14">
+    <TextBlock Text="Crie ou atualize o perfil que terá suas próprias medições." FontSize="13" Foreground="{DynamicResource PressioMutedBrush}" TextWrapping="Wrap" />
+    <TextBox Text="{Binding NewPatientName}" PlaceholderText="Nome do paciente" />
+    <TextBlock Text="{Binding PatientError}" FontSize="12" Foreground="#B42318" />
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Classes="secondary-button" Content="Cancelar" Command="{Binding CancelCommand}" />
+      <Button Classes="primary-button" Content="Salvar paciente" Command="{Binding SaveCommand}" />
+    </StackPanel>
+  </StackPanel>
+</UserControl>
