@@ -4,12 +4,14 @@
              xmlns:conv="using:Pressio.Converters"
              xmlns:m="using:Pressio.Models"
              x:Class="Pressio.Views.MainView"
-             x:DataType="vm:MainViewModel">
+             x:DataType="vm:MainViewModel"
+             TopLevel.AutoSafeAreaPadding="False">
   <UserControl.Resources>
     <conv:ColorMatchConverter x:Key="ColorMatchConverter" />
   </UserControl.Resources>
   <Design.DataContext><vm:MainViewModel /></Design.DataContext>
-  <Grid Background="{DynamicResource PressioBackgroundBrush}" RowDefinitions="Auto,*">
+  <Border x:Name="Root" Background="{DynamicResource PressioBackgroundBrush}">
+    <Grid RowDefinitions="Auto,*">
     <Border Background="{DynamicResource PressioSurfaceBrush}" Padding="20,16" BorderBrush="{DynamicResource PressioBorderBrush}" BorderThickness="0,0,0,1">
       <StackPanel Spacing="12">
         <StackPanel Spacing="3">
@@ -231,4 +233,5 @@
       </Border>
     </Grid>
   </Grid>
+  </Border>
 </UserControl>

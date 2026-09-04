@@ -6,6 +6,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using Pressio.ViewModels;
 
 namespace Pressio.Views;
@@ -19,6 +20,21 @@ public partial class MainView : UserControl
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        // No mobile a raiz é edge-to-edge (AutoSafeAreaPadding=False); aplicamos o inset
+        // do sistema como padding para o conteúdo ficar abaixo da barra de status/notch,
+        // enquanto o fundo (Root) ocupa a tela inteira.
+        Dispatcher.UIThread.Post(ApplySafeAreaPadding, DispatcherPriority.Loaded);
+    }
+
+    private void ApplySafeAreaPadding()
+    {
+        var top = TopLevel.GetTopLevel(this)?.InsetsManager?.SafeAreaPadding.Top ?? 0;
+        Root.Padding = new Thickness(0, top, 0, 0);
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)

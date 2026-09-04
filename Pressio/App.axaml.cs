@@ -1,8 +1,6 @@
-using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Controls.Platform;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Styling;
@@ -15,9 +13,6 @@ public partial class App : Application
 {
     /// <summary>ViewModel principal ativo (usado para navegação, ex.: botão voltar do Android).</summary>
     public static MainViewModel? Main { get; private set; }
-
-    /// <summary>View raiz no mobile (usada para pintar a barra de status com a cor do tema).</summary>
-    public static MainView? RootView { get; private set; }
 
     public App()
     {
@@ -47,19 +42,6 @@ public partial class App : Application
         app.Resources["PressioBorderBrush"] = new SolidColorBrush(Color.Parse(dark ? "#3A3D57" : "#E0E3F1"));
         app.Resources["PressioBannerBrush"] = new SolidColorBrush(Color.Parse(dark ? "#0F1020" : "#242B4A"));
         app.Resources["PressioBannerTextBrush"] = new SolidColorBrush(Color.Parse(dark ? "#D6D8F7" : "#D6D8F7"));
-        ApplySystemBarColor();
-    }
-
-    // Pinta a barra de status (área do relógio/notificações) com a cor do tema, para o app
-    // ocupar a tela inteira no mobile em vez de exibir a faixa preta do safe area do sistema.
-    private static void ApplySystemBarColor()
-    {
-        if (!OperatingSystem.IsIOS() && !OperatingSystem.IsAndroid()) return;
-        if (Current is not App app) return;
-        if (app.Resources["PressioBackgroundBrush"] is not SolidColorBrush bgBrush) return;
-        var topLevel = RootView is null ? null : TopLevel.GetTopLevel(RootView);
-        if (topLevel?.InsetsManager is { } insets)
-            insets.SystemBarColor = bgBrush.Color;
     }
     public override void Initialize()
     {
@@ -79,21 +61,15 @@ public partial class App : Application
         else if (ApplicationLifetime is IActivityApplicationLifetime singleViewFactoryApplicationLifetime)
         {
             Main = new MainViewModel(isMobileLayout: true);
-            singleViewFactoryApplicationLifetime.MainViewFactory = () =>
-            {
-                var view = new MainView { DataContext = Main };
-                view.AttachedToVisualTree += (_, _) => ApplySystemBarColor();
-                RootView = view;
-                return view;
-            };
+            singleViewFactoryApplicationLifetime.MainViewFactory = () => new MainView { DataContext = Main };
         }
         else if (ApplicationLifetime is ISingleViewApplicationLifetime singleViewPlatform)
         {
             Main = new MainViewModel(isMobileLayout: true);
-            var view = new MainView { DataContext = Main };
-            view.AttachedToVisualTree += (_, _) => ApplySystemBarColor();
-            singleViewPlatform.MainView = view;
-            RootView = view;
+            singleViewPlatform.MainView = new MainView
+            {
+                DataContext = Main
+            };
         }
 
         base.OnFrameworkInitializationCompleted();
