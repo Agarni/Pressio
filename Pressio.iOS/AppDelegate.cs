@@ -4,7 +4,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.iOS;
 using Avalonia.Media;
-using Pressio.Services;
 using ReactiveUI.Avalonia;
 
 namespace Pressio.iOS;
@@ -22,12 +21,5 @@ public partial class AppDelegate : AvaloniaAppDelegate<App>
         return base.CustomizeAppBuilder(builder)
             .WithInterFont()
             .UseReactiveUI();
-    }
-
-    // Recebe o deep-link "pressio://..." (ex.: clique no magic link) e encaminha ao app.
-    public override bool OpenUrl(UIApplication app, NSUrl url, NSDictionary options)
-    {
-        DeepLink.Handle(url.AbsoluteString ?? string.Empty);
-        return true;
     }
 }

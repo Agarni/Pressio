@@ -20,7 +20,6 @@ public sealed class SettingsViewModel : ViewModelBase
         SignUpCommand = ReactiveCommand.Create(() => SignUpRequested?.Invoke());
         SignOutCommand = ReactiveCommand.Create(() => SignOutRequested?.Invoke());
         SyncNowCommand = ReactiveCommand.Create(() => SyncRequested?.Invoke());
-        SendMagicLinkCommand = ReactiveCommand.Create(() => SendMagicLinkRequested?.Invoke());
     }
 
     public event Action? ApplyRequested;
@@ -33,7 +32,6 @@ public sealed class SettingsViewModel : ViewModelBase
     public event Action? SignUpRequested;
     public event Action? SignOutRequested;
     public event Action? SyncRequested;
-    public event Action? SendMagicLinkRequested;
 
     public ReactiveCommand<Unit, Unit> ApplyCommand { get; }
     public ReactiveCommand<Unit, Unit> CancelCommand { get; }
@@ -46,7 +44,6 @@ public sealed class SettingsViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> SignUpCommand { get; }
     public ReactiveCommand<Unit, Unit> SignOutCommand { get; }
     public ReactiveCommand<Unit, Unit> SyncNowCommand { get; }
-    public ReactiveCommand<Unit, Unit> SendMagicLinkCommand { get; }
 
     public IReadOnlyList<string> AppearanceOptions { get; } = new[] { "Claro", "Escuro" };
     public IReadOnlyList<string> PrimaryColorOptions { get; } = new[] { "Índigo", "Azul", "Verde", "Roxo", "Coral" };

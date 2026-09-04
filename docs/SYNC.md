@@ -119,8 +119,8 @@ para cada entidade em { pacientes, medições, lembretes, configurações }:
 
 ## 9. Próximos passos (futuro)
 
-- **Auto-sync ao abrir o app** (ou em intervalo).
+- **Auto-sync ao abrir o app** ✅ (implementado — silencioso quando autenticado).
 - **Realtime** do Supabase (subscription) para refletir mudanças em segundos.
 - **Status/diagnóstico** na tela "Sobre".
 - **Compactar tombstones**.
-- **Magic link** (login por link) — requer captura de deep-link por plataforma.
+- **Magic link (login por link)** — ⚠️ adiado: exige captura de deep-link por plataforma; no iOS o `AvaloniaAppDelegate.OpenUrl` não é virtual (não dá para sobrescrever nesta versão do Avalonia). A infraestrutura (`SupabaseClient.SendMagicLinkAsync`/`CompleteMagicLinkAsync` + `DeepLink` bridge) está pronta; falta o hook de plataforma (ex.: intent-filter no Android, scheme no desktop). Até lá, usar **e-mail + senha**.

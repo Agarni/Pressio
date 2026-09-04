@@ -271,8 +271,6 @@ public class MainViewModel : ViewModelBase
         Settings.SignUpRequested += () => _ = SignUpAsync();
         Settings.SignOutRequested += SignOut;
         Settings.SyncRequested += SyncNow;
-        Settings.SendMagicLinkRequested += () => _ = SendMagicLinkAsync();
-        DeepLink.UrlReceived += OnDeepLinkUrl;
         _syncService = new SyncService(_measurementRepository, _reminderRepository, _settingsRepository, _settingsRepository.GetOrCreateSyncDeviceId());
         ShowAboutCommand = ReactiveCommand.Create(() => { _isAboutSplash = false; this.RaisePropertyChanged(nameof(IsAboutCloseVisible)); IsAboutVisible = true; });
         CloseAboutCommand = ReactiveCommand.Create(() => { IsAboutVisible = false; });
@@ -424,32 +422,6 @@ public class MainViewModel : ViewModelBase
         Settings.IsAuthenticated = false;
         Settings.AuthUserEmail = string.Empty;
         Settings.SyncStatus = "Sessão encerrada.";
-    }
-
-    private async Task SendMagicLinkAsync()
-    {
-        var result = await _supabase.SendMagicLinkAsync(Settings.AuthEmail);
-        if (result.Success) Settings.SyncStatus = "Link enviado! Abra-o no e-mail para entrar.";
-        else Settings.SyncStatus = result.Error ?? "Não foi possível enviar o link.";
-    }
-
-    private void OnDeepLinkUrl(string url)
-    {
-        var fragment = url.Contains('#') ? url[(url.IndexOf('#') + 1)..] : url;
-        if (fragment.StartsWith('?')) fragment = fragment[1..];
-        var parts = fragment.Split('&')
-            .Select(p => p.Split('=', 2))
-            .Where(a => a.Length == 2)
-            .ToDictionary(a => a[0], a => Uri.UnescapeDataString(a[1]));
-        if (parts.TryGetValue("access_token", out var access) && parts.TryGetValue("refresh_token", out var refresh))
-            _ = CompleteMagicLinkAsync(access, refresh);
-    }
-
-    private async Task CompleteMagicLinkAsync(string access, string refresh)
-    {
-        var result = await _supabase.CompleteMagicLinkAsync(access, refresh);
-        if (result.Success) ApplyAuth();
-        else Settings.SyncStatus = result.Error ?? "Não foi possível entrar pelo link.";
     }
 
     public string BuildLocalSyncJson() => _syncService.Serialize(_syncService.BuildLocalSnapshot());
