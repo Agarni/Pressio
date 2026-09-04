@@ -8,6 +8,11 @@ namespace Pressio.Services;
 
 public sealed class SettingsRepository
 {
+    // Projeto Supabase do Pressio (URL pública + anon key). A anon key é segura para embutir
+    // porque o RLS protege os dados; NUNCA coloque a service_role aqui (ignora as permissões).
+    private const string DefaultSupabaseUrl = "https://ewckbfpohkuzxswqpxto.supabase.co";
+    private const string DefaultSupabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3Y2tiZnBvaGt1enhzd3FweHRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NzgwODUsImV4cCI6MjEwNDA1NDA4NX0.RfqDtQEMbe0VBKezcIbAU8h2VJeQFbPADD88Xm6aVeA";
+
     private readonly string _connectionString;
 
     public SettingsRepository(string? dbPath = null)
@@ -23,8 +28,8 @@ public sealed class SettingsRepository
     public string GetMeasurementDisplayFormat() => Get("MeasurementDisplayFormat", "13/8");
     public string? GetLastExportDirectory() => Get("LastExportDirectory", string.Empty) is { Length: > 0 } dir ? dir : null;
     public string? GetLastSyncDirectory() => Get("LastSyncDirectory", string.Empty) is { Length: > 0 } dir ? dir : null;
-    public string GetSupabaseUrl() => Get("SupabaseUrl", string.Empty);
-    public string GetSupabaseAnonKey() => Get("SupabaseAnonKey", string.Empty);
+    public string GetSupabaseUrl() => Get("SupabaseUrl", DefaultSupabaseUrl);
+    public string GetSupabaseAnonKey() => Get("SupabaseAnonKey", DefaultSupabaseAnonKey);
     public void SaveSupabase(string url, string anonKey) { Set("SupabaseUrl", url); Set("SupabaseAnonKey", anonKey); }
     public void SaveAppearance(string appearance, string primaryColor)
     {
