@@ -106,6 +106,7 @@ public class MainViewModel : ViewModelBase
         set
         {
             this.RaiseAndSetIfChanged(ref _selectedPatient, value);
+            if (value is not null) _settingsRepository.SaveLastPatientId(value.Id);
             ReloadMeasurements();
             this.RaisePropertyChanged(nameof(PatientName)); this.RaisePropertyChanged(nameof(Initials));
         }
@@ -317,8 +318,7 @@ public class MainViewModel : ViewModelBase
         BackupCommand = ReactiveCommand.CreateFromTask(Backup);
         RestoreCommand = ReactiveCommand.CreateFromTask(Restore);
         LoadAppSettings();
-        foreach (var patient in _measurementRepository.GetPatients()) Patients.Add(patient);
-        SelectedPatient = Patients.FirstOrDefault();
+        ReloadPatients();
     }
 
     private void LoadAppSettings()
@@ -429,6 +429,7 @@ public class MainViewModel : ViewModelBase
     {
         var merged = _syncService.ApplyRemote(remoteJson);
         Settings.SyncStatus = $"Sincronizado às {DateTime.Now:HH:mm} — {merged.Patients.Count} pacientes, {merged.Measurements.Count} medições, {merged.Reminders.Count} lembretes.";
+        ReloadPatients();
         ReloadMeasurements();
         ReloadReminders();
         RescheduleEnabledReminders();
@@ -560,7 +561,8 @@ public class MainViewModel : ViewModelBase
     {
         Patients.Clear();
         foreach (var patient in _measurementRepository.GetPatients()) Patients.Add(patient);
-        SelectedPatient = Patients.FirstOrDefault();
+        var last = _settingsRepository.GetLastPatientId();
+        SelectedPatient = last != 0 && Patients.FirstOrDefault(p => p.Id == last) is { } p ? p : Patients.FirstOrDefault();
     }
 
     private async Task ExportCsv()

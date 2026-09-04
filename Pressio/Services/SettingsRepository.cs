@@ -35,6 +35,8 @@ public sealed class SettingsRepository
     public void SaveAuthSession(string payload) => Set("SupabaseSession", payload);
     public string GetRememberedEmail() => Get("AuthEmail", string.Empty);
     public void SaveRememberedEmail(string email) => Set("AuthEmail", email);
+    public long GetLastPatientId() => long.TryParse(Get("LastPatientId", "0"), out var id) ? id : 0;
+    public void SaveLastPatientId(long id) => Set("LastPatientId", id.ToString());
     public void ClearAuthSession() => Set("SupabaseSession", string.Empty);
     public void SaveAppearance(string appearance, string primaryColor)
     {
