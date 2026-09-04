@@ -3,6 +3,20 @@
 > Complementa o `PRD.md`. Interface e textos em **português (pt-BR)**.
 > Legenda: 🟢 rápido · 🟡 médio · 🔴 alto (esforço/risco)
 
+> ✔ = já feito. Itens sem o check continuam no roadmap.
+
+---
+
+## 0. Concluído (UX / mobile)
+
+- ✔ **Sincronização na nuvem (Supabase)** — Auth e-mail+senha + RLS; auto-sync ao abrir.
+- ✔ **Compactação de tombstones** (>30 dias) após cada sync.
+- ✔ **Tela de usuários / perfil ativo no topo** — chip "USUÁRIO ATIVO" abre a tela (lista + CRUD + "Definir como ativo"); nomenclatura de UI mudada de "paciente" → "usuário".
+- ✔ **Botões de ação no cabeçalho (mobile)** — rodapé oculto no mobile (teclado o cobria); Salvar no topo, Voltar cancela.
+- ✔ **Fontes maiores no mobile** — `MobileFontSizeConverter` (textos ~1.8, controles ~1.2).
+- ✔ **Ajustes visuais** — detalhes opcionais após Medicação; engrenagem/Configurações; correção de notificação duplicada no iOS/Android.
+- ✔ **Edge-to-edge no iOS** — fundo ocupa a tela inteira (safe area tratado via `AutoSafeAreaPadding=False` + `Border` com padding do `InsetsManager.SafeAreaPadding.Top`).
+
 ---
 
 ## 1. Sincronização entre dispositivos ⭐ (prioridade)
