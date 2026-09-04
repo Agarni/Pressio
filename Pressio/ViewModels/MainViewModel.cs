@@ -376,6 +376,7 @@ public class MainViewModel : ViewModelBase
             var remote = await _supabase.FetchSnapshotAsync();
             var mergedJson = ApplyRemoteSync(remote, showMessage: showResult);
             await _supabase.SaveSnapshotAsync(mergedJson);
+            _syncService.CompactTombstones();
         }
         catch (Exception ex)
         {

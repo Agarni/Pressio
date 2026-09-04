@@ -169,6 +169,32 @@ public sealed class SyncTests : IDisposable
         Assert.Single(merged.Patients); // o "Meu perfil" local
     }
 
+    [Fact]
+    public void CompactTombstones_RemovesOldKeepsRecent()
+    {
+        var repo = new MeasurementRepository(_dbPath);
+        var patient = repo.GetPatients().Single();
+        var oldId = repo.Add(new BloodPressureMeasurement(140, 90, DateTime.Now, MedicationTiming.NotInformed), patient.Id);
+        repo.Delete(oldId);
+        using (var conn = new SqliteConnection($"Data Source={_dbPath}"))
+        {
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "UPDATE BloodPressureMeasurements SET UpdatedAtUtc=$old WHERE Id=$id";
+            cmd.Parameters.AddWithValue("$old", DateTime.UtcNow.AddDays(-40).ToString("O"));
+            cmd.Parameters.AddWithValue("$id", oldId);
+            cmd.ExecuteNonQuery();
+        }
+        var recentId = repo.Add(new BloodPressureMeasurement(120, 80, DateTime.Now, MedicationTiming.NotInformed), patient.Id);
+        repo.Delete(recentId);
+
+        repo.CompactTombstones(olderThanDays: 30);
+
+        var sync = repo.GetSyncMeasurements().ToList();
+        Assert.DoesNotContain(sync, m => m.Systolic == 140);              // tombstone antigo removido
+        Assert.Contains(sync, m => m.Systolic == 120 && m.Deleted);       // tombstone recente mantido
+    }
+
     private static SyncService CreateService(string path) =>
         new(new MeasurementRepository(path), new ReminderRepository(path), new SettingsRepository(path), "dev");
 

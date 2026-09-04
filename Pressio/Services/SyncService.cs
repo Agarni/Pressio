@@ -112,6 +112,10 @@ public sealed class SyncService
     /// <summary>Exporta o snapshot local para um arquivo JSON.</summary>
     public void ExportToFile(string path) => _store.WriteToFile(path, BuildLocalSnapshot());
 
+    /// <summary>Remove tombstones antigos (exclusões já propagadas) para não crescer indefinidamente.</summary>
+    public int CompactTombstones(int olderThanDays = 30) =>
+        _measurements.CompactTombstones(olderThanDays) + _reminders.CompactTombstones(olderThanDays);
+
     /// <summary>Lê um arquivo, mescla com o local, aplica no banco e grava o resultado no arquivo.</summary>
     public SyncSnapshot ImportFromFile(string path)
     {

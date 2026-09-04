@@ -184,6 +184,15 @@ public sealed class MeasurementRepository
         command.Parameters.AddWithValue("$syncId", syncId); command.Parameters.AddWithValue("$updatedAt", DateTime.UtcNow.ToString("O")); command.ExecuteNonQuery();
     }
 
+    // Remove tombstones antigos (mais de `olderThanDays` dias) — dados já consumidos pelos outros dispositivos.
+    public int CompactTombstones(int olderThanDays = 30)
+    {
+        using var connection = Open(); using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM BloodPressureMeasurements WHERE Deleted=1 AND UpdatedAtUtc < $cutoff; DELETE FROM Patients WHERE Deleted=1 AND UpdatedAtUtc < $cutoff";
+        command.Parameters.AddWithValue("$cutoff", DateTime.UtcNow.AddDays(-olderThanDays).ToString("O"));
+        return command.ExecuteNonQuery();
+    }
+
     private SqliteConnection Open() { var connection = new SqliteConnection(_connectionString); connection.Open(); return connection; }
 
     private static object? ScalarString(SqliteConnection connection, string sql, long id)
