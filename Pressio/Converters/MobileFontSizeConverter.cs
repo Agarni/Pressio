@@ -8,7 +8,7 @@ namespace Pressio.Converters;
 // ConverterParameter é o tamanho base (ex.: "12"); o tamanho real = base * Scale.
 public sealed class MobileFontSizeConverter : IValueConverter
 {
-    private const double Scale = 1.2;
+    private const double Scale = 2.0;
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
