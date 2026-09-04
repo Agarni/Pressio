@@ -23,6 +23,17 @@
 	</dict>
 	<key>CFBundleIdentifier</key>
 	<string>agarnidev.Pressio</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>pressio</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>pressio</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
 	<key>CFBundleVersion</key>

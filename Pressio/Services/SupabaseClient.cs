@@ -122,6 +122,30 @@ public sealed class SupabaseClient
         return new(true, null);
     }
 
+    public async Task<AuthResult> SendMagicLinkAsync(string email)
+    {
+        if (!IsConfigured) return new(false, "Configure a URL e a chave do Supabase em Configurações.");
+        using var request = NewRequest(HttpMethod.Post, "/auth/v1/magiclink", authed: false);
+        request.Content = new StringContent(JsonSerializer.Serialize(new { email, options = new { redirect_to = "pressio://auth" } }), Encoding.UTF8, "application/json");
+        using var response = await _http.SendAsync(request);
+        if (!response.IsSuccessStatusCode) return new(false, await ReadErrorAsync(response));
+        return new(true, null);
+    }
+
+    // Completa a sessão a partir dos tokens recebidos no deep-link do magic link e busca o usuário.
+    public async Task<AuthResult> CompleteMagicLinkAsync(string accessToken, string refreshToken)
+    {
+        AccessToken = accessToken;
+        RefreshToken = refreshToken;
+        using var request = NewRequest(HttpMethod.Get, "/auth/v1/user", authed: true);
+        using var response = await _http.SendAsync(request);
+        if (!response.IsSuccessStatusCode) { ClearSession(); return new(false, await ReadErrorAsync(response)); }
+        var json = JsonNode.Parse(await response.Content.ReadAsStringAsync()) as JsonObject;
+        UserId = json?["id"]?.GetValue<string>();
+        Email = json?["email"]?.GetValue<string>();
+        return IsAuthenticated ? new(true, null) : new(false, "Não foi possível identificar o usuário a partir do link.");
+    }
+
     private void SetSession(string access, string? refresh, string? userId)
     {
         AccessToken = access;
