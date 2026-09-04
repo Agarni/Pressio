@@ -76,7 +76,12 @@ public sealed class SupabaseClient
         {
             var body = await response.Content.ReadAsStringAsync();
             var node = JsonNode.Parse(body);
-            if (node is JsonObject obj && obj["message"] is JsonValue msg) return msg.GetValue<string>() ?? response.ReasonPhrase ?? "Erro";
+            if (node is JsonObject obj)
+            {
+                // Supabase usa "msg" (GoTrue); PostgREST usa "message".
+                if (obj["msg"] is JsonValue v1) return v1.GetValue<string>() ?? response.ReasonPhrase ?? "Erro";
+                if (obj["message"] is JsonValue v2) return v2.GetValue<string>() ?? response.ReasonPhrase ?? "Erro";
+            }
         }
         catch { }
         return response.ReasonPhrase ?? "Erro desconhecido";
