@@ -319,6 +319,7 @@ public class MainViewModel : ViewModelBase
         RestoreCommand = ReactiveCommand.CreateFromTask(Restore);
         LoadAppSettings();
         ReloadPatients();
+        if (_supabase.IsAuthenticated) _ = SyncCloudAsync(showResult: false);
     }
 
     private void LoadAppSettings()
@@ -360,25 +361,26 @@ public class MainViewModel : ViewModelBase
     private void SyncNow()
     {
         if (!_supabase.IsAuthenticated) { SetSyncError("Entre com sua conta (Configurações → Sincronização) para sincronizar na nuvem."); return; }
-        _ = SyncCloudAsync();
+        _ = SyncCloudAsync(showResult: true);
     }
 
-    private async Task SyncCloudAsync()
+    private async Task SyncCloudAsync(bool showResult)
     {
         try
         {
-            if (!_supabase.IsAuthenticated) { SetSyncError("Sessão inválida. Faça login novamente."); return; }
+            if (!_supabase.IsAuthenticated) { if (showResult) SetSyncError("Sessão inválida. Faça login novamente."); return; }
             // Garante um access token válido (renova se o anterior expirou).
             var refreshed = await _supabase.RefreshAsync();
-            if (!refreshed.Success) { SetSyncError("Sessão expirada. Faça login novamente."); return; }
+            if (!refreshed.Success) { if (showResult) SetSyncError("Sessão expirada. Faça login novamente."); return; }
             _settingsRepository.SaveAuthSession(_supabase.SerializeSession());
             var remote = await _supabase.FetchSnapshotAsync();
-            var mergedJson = ApplyRemoteSync(remote);
+            var mergedJson = ApplyRemoteSync(remote, showMessage: showResult);
             await _supabase.SaveSnapshotAsync(mergedJson);
         }
         catch (Exception ex)
         {
-            SetSyncError("Falha ao sincronizar: " + ex.Message);
+            Settings.SyncStatus = "Falha ao sincronizar: " + ex.Message;
+            if (showResult) ShowMessage(Settings.SyncStatus);
         }
     }
 
@@ -425,7 +427,7 @@ public class MainViewModel : ViewModelBase
     public string BuildLocalSyncJson() => _syncService.Serialize(_syncService.BuildLocalSnapshot());
 
     /// <summary>Mescla o local com o remoto (string JSON), aplica no banco e retorna o JSON mesclado.</summary>
-    public string ApplyRemoteSync(string? remoteJson)
+    public string ApplyRemoteSync(string? remoteJson, bool showMessage = true)
     {
         var merged = _syncService.ApplyRemote(remoteJson);
         Settings.SyncStatus = $"Sincronizado às {DateTime.Now:HH:mm} — {merged.Patients.Count} pacientes, {merged.Measurements.Count} medições, {merged.Reminders.Count} lembretes.";
@@ -433,7 +435,7 @@ public class MainViewModel : ViewModelBase
         ReloadMeasurements();
         ReloadReminders();
         RescheduleEnabledReminders();
-        ShowMessage(Settings.SyncStatus);
+        if (showMessage) ShowMessage(Settings.SyncStatus);
         return _syncService.Serialize(merged);
     }
 
