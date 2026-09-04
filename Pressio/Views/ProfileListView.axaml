@@ -6,7 +6,7 @@
   <Grid RowDefinitions="*,Auto">
     <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Disabled">
       <StackPanel Spacing="14" Margin="20,16,20,16">
-        <Button Classes="primary-button" Content="+ Novo paciente" Command="{Binding AddCommand}" HorizontalContentAlignment="Center" />
+        <Button Classes="primary-button" Content="+ Novo usuário" Command="{Binding AddCommand}" HorizontalContentAlignment="Center" />
         <TextBlock Text="Selecione um perfil para editar, definir como ativo ou excluir." FontSize="12" Foreground="{DynamicResource PressioMutedBrush}" TextWrapping="Wrap" />
         <ListBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}">
           <ListBox.ItemTemplate>

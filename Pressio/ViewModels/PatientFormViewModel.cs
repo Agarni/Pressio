@@ -24,7 +24,7 @@ public sealed class PatientFormViewModel : ViewModelBase
     // true no mobile: os botões de ação ficam no cabeçalho (Não no rodapé), para o teclado não cobri-los.
     public bool IsMobileLayout { get; set; }
 
-    public string Title => IsEditMode ? "Editar paciente" : "Novo paciente";
+    public string Title => IsEditMode ? "Editar usuário" : "Novo usuário";
 
     private bool _isEditMode;
     public bool IsEditMode

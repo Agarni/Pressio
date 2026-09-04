@@ -38,7 +38,7 @@ public class MainViewModel : ViewModelBase
     public bool IsSettingsMobilePageVisible => IsSettingsVisible && IsMobileLayout;
     public bool IsProfileListDialogVisible => IsProfileListVisible && !IsMobileLayout;
     public bool IsProfileListMobilePageVisible => IsProfileListVisible && IsMobileLayout;
-    public string PatientName => SelectedPatient?.Name ?? "Selecione um paciente";
+    public string PatientName => SelectedPatient?.Name ?? "Selecione um usuário";
     public string Initials => string.Concat(PatientName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(x => x[0])).ToUpperInvariant()[..Math.Min(2, PatientName.Length)];
     public string LastReading => Measurements.FirstOrDefault()?.DisplayValue ?? "—";
     public string LastReadingDetails => Measurements.FirstOrDefault() is { } measurement ? $"{measurement.DisplayDate}  •  {DescribeMedicationTiming(measurement.MedicationTiming)}" : "Nenhuma medição registrada";
@@ -70,6 +70,7 @@ public class MainViewModel : ViewModelBase
     private bool _isProfileListVisible;
     private long? _pendingDeletePatientId;
     private long? _editingPatientId;
+    private bool _returnToProfileList;
     private bool _isAboutVisible;
     private bool _isAboutSplash = true;
     private bool _isConfirmDialogVisible;
@@ -278,7 +279,7 @@ public class MainViewModel : ViewModelBase
         ShowPatientFormCommand = ReactiveCommand.Create(ShowNewPatientForm);
         EditPatientCommand = ReactiveCommand.Create(EditPatient);
         PatientForm.SaveRequested += SavePatient;
-        PatientForm.CancelRequested += () => { IsPatientFormVisible = false; };
+        PatientForm.CancelRequested += ClosePatientForm;
         DeletePatientCommand = ReactiveCommand.Create(DeletePatient);
         ShowProfileListCommand = ReactiveCommand.Create(OpenProfileList);
         ProfileList.AddRequested += ShowNewPatientForm;
@@ -457,7 +458,7 @@ public class MainViewModel : ViewModelBase
     public string ApplyRemoteSync(string? remoteJson, bool showMessage = true)
     {
         var merged = _syncService.ApplyRemote(remoteJson);
-        Settings.SyncStatus = $"Sincronizado às {DateTime.Now:HH:mm} — {merged.Patients.Count} pacientes, {merged.Measurements.Count} medições, {merged.Reminders.Count} lembretes.";
+        Settings.SyncStatus = $"Sincronizado às {DateTime.Now:HH:mm} — {merged.Patients.Count} usuários, {merged.Measurements.Count} medições, {merged.Reminders.Count} lembretes.";
         ReloadPatients();
         ReloadMeasurements();
         ReloadReminders();
@@ -502,7 +503,7 @@ public class MainViewModel : ViewModelBase
         }
         else
         {
-            if (SelectedPatient is null) { MeasurementForm.MeasurementError = "Cadastre ou selecione um paciente antes de salvar."; return; }
+            if (SelectedPatient is null) { MeasurementForm.MeasurementError = "Cadastre ou selecione um usuário antes de salvar."; return; }
             var id = _measurementRepository.Add(measurement, SelectedPatient.Id);
             measurement = measurement with { Id = id };
         }
@@ -527,7 +528,7 @@ public class MainViewModel : ViewModelBase
 
     private void SavePatient()
     {
-        if (string.IsNullOrWhiteSpace(PatientForm.NewPatientName)) { PatientForm.PatientError = "Informe o nome do paciente."; return; }
+        if (string.IsNullOrWhiteSpace(PatientForm.NewPatientName)) { PatientForm.PatientError = "Informe o nome do usuário."; return; }
         var name = PatientForm.NewPatientName.Trim();
         if (PatientForm.IsEditMode && _editingPatientId is { } pid)
         {
@@ -547,7 +548,16 @@ public class MainViewModel : ViewModelBase
             SelectedPatient = patient;
         }
         IsPatientFormVisible = false;
-        if (IsProfileListVisible) RefreshProfileList();
+        if (_returnToProfileList)
+        {
+            _returnToProfileList = false;
+            RefreshProfileList();
+            IsProfileListVisible = true;
+        }
+        else if (IsProfileListVisible)
+        {
+            RefreshProfileList();
+        }
     }
 
     private async Task Backup()
@@ -678,9 +688,22 @@ public class MainViewModel : ViewModelBase
         if (!string.IsNullOrWhiteSpace(directory)) _settingsRepository.SaveLastExportDirectory(directory);
     }
 
+    private void ClosePatientForm()
+    {
+        IsPatientFormVisible = false;
+        if (_returnToProfileList)
+        {
+            _returnToProfileList = false;
+            RefreshProfileList();
+            IsProfileListVisible = true;
+        }
+    }
+
     private void ShowNewPatientForm()
     {
         _editingPatientId = null;
+        _returnToProfileList = true;
+        IsProfileListVisible = false;
         PatientForm.IsEditMode = false;
         PatientForm.NewPatientName = string.Empty;
         PatientForm.PatientError = string.Empty;
@@ -714,6 +737,8 @@ public class MainViewModel : ViewModelBase
     {
         if (ProfileList.SelectedProfile is not { } item) return;
         _editingPatientId = item.Patient.Id;
+        _returnToProfileList = true;
+        IsProfileListVisible = false;
         PatientForm.IsEditMode = true;
         PatientForm.NewPatientName = item.Patient.Name;
         PatientForm.PatientError = string.Empty;
@@ -726,12 +751,12 @@ public class MainViewModel : ViewModelBase
         if (ProfileList.SelectedProfile is not { } item) return;
         if (ProfileList.Profiles.Count <= 1)
         {
-            ShowMessage("Mantenha ao menos um paciente cadastrado.");
+            ShowMessage("Mantenha ao menos um usuário cadastrado.");
             return;
         }
         _pendingDeletePatientId = item.Patient.Id;
         _pendingConfirmation = ConfirmationAction.DeletePatient;
-        ConfirmMessage = $"Excluir o paciente \"{item.Patient.Name}\" e todas as suas medições?";
+        ConfirmMessage = $"Excluir o usuário \"{item.Patient.Name}\" e todas as suas medições?";
         IsConfirmDialogVisible = true;
     }
 
