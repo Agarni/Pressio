@@ -9,9 +9,9 @@
 
 Meta: usar o app no celular **e** no computador com os mesmos dados, **sem servidor próprio**.
 
-Como hoje **não há infraestrutura de servidor**, a estratégia recomendada é **sincronização por arquivo numa pasta de nuvem** (OneDrive / Google Drive / iCloud), em **modo manual**. O usuário escolhe uma pasta compartilhada em cada dispositivo e clica em "Sincronizar".
+Como hoje **não há infraestrutura de servidor**, a sincronização usa **Supabase** (plano gratuito) com **Auth por e-mail + senha** e **RLS** (cada usuário tem os próprios dados). O app sincroniza o snapshot do usuário logado via **Configurações → Sincronização → "Sincronizar agora"**.
 
-Leia o design técnico completo: **[docs/SYNC.md](SYNC.md)** (inclui a abstração de transporte e as opções de nuvem gratuita — Supabase/Turso — quando o usuário quiser tempo real).
+Leia o design técnico completo: **[docs/SYNC.md](SYNC.md)** (modelo nuvem/Supabase + RLS, e as alternativas consideradas — pasta/iCloud foi descartada por não funcionar no iOS).
 
 Alternativas sem servidor (candidatas, da mais simples à mais robusta):
 
@@ -51,7 +51,7 @@ Alternativas sem servidor (candidatas, da mais simples à mais robusta):
 
 ## 5. Prioridade sugerida
 
-1. 🔴 **Sincronização por pasta de nuvem** (item 1) — o que você destacou e a de maior utilidade prática.
+1. 🔴 **Sincronização na nuvem (Supabase)** — implementada (Auth + RLS por usuário).
 2. 🟢 **Faixas de classificação** + 🟢 **média móvel por horário** — rápidas e visíveis.
 3. 🟡 **Correlações** + 🟡 **testes de integração**.
 4. 🔴 **Leitura por foto** (após a sincronia estabilizar).
