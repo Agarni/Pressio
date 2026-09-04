@@ -142,17 +142,5 @@ public partial class MainView : UserControl
             }
             ctx.SetOutput(Unit.Default);
         });
-
-        vm.ShowMessageInteraction.RegisterHandler(async ctx =>
-        {
-            if (TopLevel.GetTopLevel(this) is not Window owner) { ctx.SetOutput(Unit.Default); return; }
-            var panel = new StackPanel { Margin = new Thickness(20), Spacing = 16 };
-            panel.Children.Add(new TextBlock { Text = ctx.Input, TextWrapping = TextWrapping.Wrap, FontSize = 14 });
-            var ok = new Button { Content = "OK", Classes = { "primary-button" }, HorizontalAlignment = HorizontalAlignment.Right };
-            panel.Children.Add(ok);
-            var dialog = new Window { Width = 380, Height = 190, CanResize = false, Title = "Pressio", Content = panel };
-            ok.Click += (_, _) => dialog.Close();
-            ctx.SetOutput(await dialog.ShowDialog<Unit>(owner));
-        });
     }
 }

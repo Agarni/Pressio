@@ -80,6 +80,8 @@ public class MainViewModel : ViewModelBase
     private ReminderItem? _selectedReminder;
     private bool _isReminderNoticeVisible;
     private string _reminderNoticeMessage = string.Empty;
+    private string _message = string.Empty;
+    private bool _isMessageVisible;
     private readonly HashSet<(long Id, DateTime Date)> _firedReminders = new();
 
     public bool IsMeasurementFormVisible
@@ -202,7 +204,6 @@ public class MainViewModel : ViewModelBase
     public Interaction<Unit, string?> OpenFileInteraction { get; } = new();
     public Interaction<Unit, string?> FolderPickerInteraction { get; } = new();
     public Interaction<Unit, Unit> SyncNowInteraction { get; } = new();
-    public Interaction<string, Unit> ShowMessageInteraction { get; } = new();
     public ReactiveCommand<Unit, Unit> EditPatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> DeletePatientCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ShowSettingsCommand { get; private set; } = null!;
@@ -218,6 +219,7 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> EditReminderCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> DeleteReminderCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> DismissReminderNoticeCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> DismissMessageCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ClearFiltersCommand { get; private set; } = null!;
 
     private void Initialize()
@@ -292,6 +294,7 @@ public class MainViewModel : ViewModelBase
         EditReminderCommand = ReactiveCommand.Create(EditReminder);
         DeleteReminderCommand = ReactiveCommand.Create(DeleteSelectedReminder);
         DismissReminderNoticeCommand = ReactiveCommand.Create(() => { IsReminderNoticeVisible = false; });
+        DismissMessageCommand = ReactiveCommand.Create(() => { IsMessageVisible = false; });
         ReminderForm.SaveRequested += SaveReminder;
         ReminderForm.CancelRequested += () => { IsReminderFormVisible = false; };
         try { Observable.Interval(TimeSpan.FromSeconds(20), RxApp.MainThreadScheduler).Subscribe(_ => CheckDueReminders()); } catch { }
@@ -359,15 +362,20 @@ public class MainViewModel : ViewModelBase
         ReloadMeasurements();
         ReloadReminders();
         RescheduleEnabledReminders();
-        _ = ShowMessageInteraction.Handle(Settings.SyncStatus);
+        ShowMessage(Settings.SyncStatus);
         return _syncService.Serialize(merged);
     }
 
     public void SetSyncError(string message)
     {
         Settings.SyncStatus = message;
-        _ = ShowMessageInteraction.Handle(message);
+        ShowMessage(message);
     }
+
+    // Overlay in-app de mensagem (funciona em mobile; Window.ShowDialog não existe em iOS).
+    public void ShowMessage(string message) { Message = message; IsMessageVisible = true; }
+    public string Message { get => _message; set => this.RaiseAndSetIfChanged(ref _message, value); }
+    public bool IsMessageVisible { get => _isMessageVisible; set => this.RaiseAndSetIfChanged(ref _isMessageVisible, value); }
 
     private void SaveMeasurement()
     {
