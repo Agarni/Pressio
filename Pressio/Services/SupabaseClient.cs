@@ -33,6 +33,34 @@ public sealed class SupabaseClient
 
     public void ClearSession() { AccessToken = RefreshToken = UserId = Email = null; }
 
+    public string SerializeSession() => IsAuthenticated ? $"{AccessToken}|{RefreshToken}|{UserId}|{Email}" : string.Empty;
+
+    public void RestoreSession(string payload)
+    {
+        if (string.IsNullOrWhiteSpace(payload)) return;
+        var parts = payload.Split('|');
+        if (parts.Length < 3) return;
+        AccessToken = parts[0];
+        RefreshToken = parts.Length > 1 && parts[1].Length > 0 ? parts[1] : null;
+        UserId = parts[2];
+        Email = parts.Length > 3 ? parts[3] : null;
+    }
+
+    public async Task<AuthResult> RefreshAsync()
+    {
+        if (string.IsNullOrEmpty(RefreshToken)) return new(false, "Sessão expirada. Entre novamente.");
+        using var request = NewRequest(HttpMethod.Post, "/auth/v1/token?grant_type=refresh_token", authed: false);
+        request.Content = new StringContent(JsonSerializer.Serialize(new { refresh_token = RefreshToken }), Encoding.UTF8, "application/json");
+        using var response = await _http.SendAsync(request);
+        if (!response.IsSuccessStatusCode) return new(false, await ReadErrorAsync(response));
+        var json = JsonNode.Parse(await response.Content.ReadAsStringAsync()) as JsonObject;
+        var token = json?["access_token"]?.GetValue<string>();
+        if (string.IsNullOrEmpty(token)) return new(false, "Não foi possível renovar a sessão.");
+        SetSession(token, json?["refresh_token"]?.GetValue<string>() ?? RefreshToken, json?["user"]?["id"]?.GetValue<string>() ?? UserId);
+        Email ??= json?["user"]?["email"]?.GetValue<string>();
+        return new(true, null);
+    }
+
     private HttpRequestMessage NewRequest(HttpMethod method, string path, bool authed)
     {
         var request = new HttpRequestMessage(method, _url + path);

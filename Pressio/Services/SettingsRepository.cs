@@ -31,6 +31,11 @@ public sealed class SettingsRepository
     public string GetSupabaseUrl() => Get("SupabaseUrl", DefaultSupabaseUrl);
     public string GetSupabaseAnonKey() => Get("SupabaseAnonKey", DefaultSupabaseAnonKey);
     public void SaveSupabase(string url, string anonKey) { Set("SupabaseUrl", url); Set("SupabaseAnonKey", anonKey); }
+    public string GetAuthSession() => Get("SupabaseSession", string.Empty);
+    public void SaveAuthSession(string payload) => Set("SupabaseSession", payload);
+    public string GetRememberedEmail() => Get("AuthEmail", string.Empty);
+    public void SaveRememberedEmail(string email) => Set("AuthEmail", email);
+    public void ClearAuthSession() => Set("SupabaseSession", string.Empty);
     public void SaveAppearance(string appearance, string primaryColor)
     {
         Set("Appearance", appearance);

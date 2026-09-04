@@ -330,6 +330,10 @@ public class MainViewModel : ViewModelBase
         Settings.SupabaseUrl = _settingsRepository.GetSupabaseUrl();
         Settings.SupabaseAnonKey = _settingsRepository.GetSupabaseAnonKey();
         _supabase.Configure(Settings.SupabaseUrl, Settings.SupabaseAnonKey);
+        _supabase.RestoreSession(_settingsRepository.GetAuthSession());
+        Settings.AuthEmail = _settingsRepository.GetRememberedEmail();
+        Settings.IsAuthenticated = _supabase.IsAuthenticated;
+        Settings.AuthUserEmail = _supabase.Email ?? string.Empty;
         BloodPressureMeasurement.UseShorthandFormat = Settings.SelectedDisplayFormat != "130/80";
         App.ApplyAppearance(Settings.SelectedAppearance, Settings.SelectedPrimaryColor);
     }
@@ -363,6 +367,11 @@ public class MainViewModel : ViewModelBase
     {
         try
         {
+            if (!_supabase.IsAuthenticated) { SetSyncError("Sessão inválida. Faça login novamente."); return; }
+            // Garante um access token válido (renova se o anterior expirou).
+            var refreshed = await _supabase.RefreshAsync();
+            if (!refreshed.Success) { SetSyncError("Sessão expirada. Faça login novamente."); return; }
+            _settingsRepository.SaveAuthSession(_supabase.SerializeSession());
             var remote = await _supabase.FetchSnapshotAsync();
             var mergedJson = ApplyRemoteSync(remote);
             await _supabase.SaveSnapshotAsync(mergedJson);
@@ -400,11 +409,14 @@ public class MainViewModel : ViewModelBase
         Settings.IsAuthenticated = _supabase.IsAuthenticated;
         Settings.AuthUserEmail = _supabase.Email ?? string.Empty;
         Settings.SyncStatus = "Conectado: " + Settings.AuthUserEmail;
+        _settingsRepository.SaveAuthSession(_supabase.SerializeSession());
+        _settingsRepository.SaveRememberedEmail(Settings.AuthEmail);
     }
 
     private void SignOut()
     {
         _supabase.ClearSession();
+        _settingsRepository.ClearAuthSession();
         Settings.IsAuthenticated = false;
         Settings.AuthUserEmail = string.Empty;
         Settings.SyncStatus = "Sessão encerrada.";
