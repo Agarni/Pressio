@@ -1,0 +1,41 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Pressio.ViewModels"
+             x:Class="Pressio.Views.ProfileListView"
+             x:DataType="vm:ProfileListViewModel">
+  <Grid RowDefinitions="*,Auto">
+    <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Spacing="14" Margin="20,16,20,16">
+        <Button Classes="primary-button" Content="+ Novo paciente" Command="{Binding AddCommand}" HorizontalContentAlignment="Center" />
+        <TextBlock Text="Selecione um perfil para editar, definir como ativo ou excluir." FontSize="12" Foreground="{DynamicResource PressioMutedBrush}" TextWrapping="Wrap" />
+        <ListBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:PatientProfileItem">
+              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14" Margin="0,6">
+                <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource PressioPrimaryBrush}">
+                  <TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" />
+                </Border>
+                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource PressioTextBrush}" />
+                  <TextBlock Text="{Binding Patient.DisplayDetails}" FontSize="12" Foreground="{DynamicResource PressioMutedBrush}" />
+                </StackPanel>
+                <Border Grid.Column="2" Background="{DynamicResource PressioPrimaryBrush}" CornerRadius="10" Padding="10,4" IsVisible="{Binding IsActive}" VerticalAlignment="Center">
+                  <TextBlock Text="ATIVO" FontSize="11" FontWeight="Bold" Foreground="White" />
+                </Border>
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </StackPanel>
+    </ScrollViewer>
+    <Border Grid.Row="1" BorderBrush="{DynamicResource PressioBorderBrush}" BorderThickness="0,1,0,0" Padding="20,12">
+      <Grid ColumnDefinitions="*,Auto">
+        <Button Classes="primary-button" Content="Definir como ativo" Command="{Binding ActivateCommand}" IsVisible="{Binding CanActivate}" HorizontalAlignment="Left" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+          <Button Classes="secondary-button" Content="Editar" Command="{Binding EditCommand}" />
+          <Button Classes="danger-button" Content="Excluir" Command="{Binding DeleteCommand}" />
+        </StackPanel>
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>

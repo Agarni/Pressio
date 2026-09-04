@@ -21,6 +21,9 @@ public sealed class ReminderFormViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> SaveCommand { get; }
     public ReactiveCommand<Unit, Unit> CancelCommand { get; }
 
+    // true no mobile: os botões de ação ficam no cabeçalho (Não no rodapé), para o teclado não cobri-los.
+    public bool IsMobileLayout { get; set; }
+
     public string Title => IsEditMode ? "Editar lembrete" : "Novo lembrete";
 
     private bool _isEditMode;

@@ -20,7 +20,7 @@
         <TextBlock Text="{Binding MeasurementError}" Foreground="#B42318" FontSize="12" TextWrapping="Wrap" />
       </StackPanel>
     </ScrollViewer>
-    <Border Grid.Row="1" BorderBrush="{DynamicResource PressioBorderBrush}" BorderThickness="0,1,0,0" Padding="20,12">
+    <Border Grid.Row="1" BorderBrush="{DynamicResource PressioBorderBrush}" BorderThickness="0,1,0,0" Padding="20,12" IsVisible="{Binding !IsMobileLayout}">
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
         <Button Classes="secondary-button" Content="Cancelar" Command="{Binding CancelCommand}" />
         <Button Classes="primary-button" Content="Salvar medição" Command="{Binding SaveCommand}" />

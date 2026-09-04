@@ -22,6 +22,9 @@ public class MainViewModel : ViewModelBase
     public MainViewModel(bool isMobileLayout = false)
     {
         IsMobileLayout = isMobileLayout;
+        MeasurementForm.IsMobileLayout = isMobileLayout;
+        PatientForm.IsMobileLayout = isMobileLayout;
+        ReminderForm.IsMobileLayout = isMobileLayout;
         Initialize();
     }
 
@@ -33,6 +36,8 @@ public class MainViewModel : ViewModelBase
     public bool IsPatientMobilePageVisible => IsPatientFormVisible && IsMobileLayout;
     public bool IsSettingsDialogVisible => IsSettingsVisible && !IsMobileLayout;
     public bool IsSettingsMobilePageVisible => IsSettingsVisible && IsMobileLayout;
+    public bool IsProfileListDialogVisible => IsProfileListVisible && !IsMobileLayout;
+    public bool IsProfileListMobilePageVisible => IsProfileListVisible && IsMobileLayout;
     public string PatientName => SelectedPatient?.Name ?? "Selecione um paciente";
     public string Initials => string.Concat(PatientName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(x => x[0])).ToUpperInvariant()[..Math.Min(2, PatientName.Length)];
     public string LastReading => Measurements.FirstOrDefault()?.DisplayValue ?? "—";
@@ -62,6 +67,9 @@ public class MainViewModel : ViewModelBase
     private BloodPressureMeasurement? _selectedMeasurement;
     private bool _editingMeasurement;
     private bool _isSettingsVisible;
+    private bool _isProfileListVisible;
+    private long? _pendingDeletePatientId;
+    private long? _editingPatientId;
     private bool _isAboutVisible;
     private bool _isAboutSplash = true;
     private bool _isConfirmDialogVisible;
@@ -98,6 +106,7 @@ public class MainViewModel : ViewModelBase
 
     public MeasurementFormViewModel MeasurementForm { get; } = new();
     public SettingsViewModel Settings { get; } = new();
+    public ProfileListViewModel ProfileList { get; } = new();
     public ObservableCollection<BloodPressureMeasurement> Measurements { get; } = new();
     public ObservableCollection<Patient> Patients { get; } = new();
     public Patient? SelectedPatient
@@ -134,6 +143,16 @@ public class MainViewModel : ViewModelBase
             this.RaiseAndSetIfChanged(ref _isSettingsVisible, value);
             this.RaisePropertyChanged(nameof(IsSettingsDialogVisible));
             this.RaisePropertyChanged(nameof(IsSettingsMobilePageVisible));
+        }
+    }
+    public bool IsProfileListVisible
+    {
+        get => _isProfileListVisible;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _isProfileListVisible, value);
+            this.RaisePropertyChanged(nameof(IsProfileListDialogVisible));
+            this.RaisePropertyChanged(nameof(IsProfileListMobilePageVisible));
         }
     }
     public bool IsAboutVisible { get => _isAboutVisible; private set { this.RaiseAndSetIfChanged(ref _isAboutVisible, value); this.RaisePropertyChanged(nameof(IsAboutDialogVisible)); this.RaisePropertyChanged(nameof(IsAboutMobilePageVisible)); } }
@@ -197,6 +216,7 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> DeleteMeasurementCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> EditMeasurementCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ShowPatientFormCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> ShowProfileListCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ExportCsvCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ExportPdfCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> BackupCommand { get; private set; } = null!;
@@ -255,11 +275,17 @@ public class MainViewModel : ViewModelBase
         MeasurementForm.SaveRequested += SaveMeasurement;
         MeasurementForm.CancelRequested += () => { IsMeasurementFormVisible = false; };
         EditMeasurementCommand = ReactiveCommand.Create(EditSelectedMeasurement);
-        ShowPatientFormCommand = ReactiveCommand.Create(() => { PatientForm.IsEditMode = false; PatientForm.NewPatientName = string.Empty; PatientForm.PatientError = string.Empty; IsPatientFormVisible = true; PatientForm.NotifyShown(); });
+        ShowPatientFormCommand = ReactiveCommand.Create(ShowNewPatientForm);
         EditPatientCommand = ReactiveCommand.Create(EditPatient);
         PatientForm.SaveRequested += SavePatient;
         PatientForm.CancelRequested += () => { IsPatientFormVisible = false; };
         DeletePatientCommand = ReactiveCommand.Create(DeletePatient);
+        ShowProfileListCommand = ReactiveCommand.Create(OpenProfileList);
+        ProfileList.AddRequested += ShowNewPatientForm;
+        ProfileList.EditRequested += EditPatient;
+        ProfileList.DeleteRequested += DeletePatient;
+        ProfileList.ActivateRequested += ActivatePatient;
+        ProfileList.BackRequested += () => IsProfileListVisible = false;
         ShowSettingsCommand = ReactiveCommand.Create(() => { IsSettingsVisible = true; });
         Settings.ApplyRequested += ApplySettings;
         Settings.CancelRequested += () => { IsSettingsVisible = false; };
@@ -503,12 +529,15 @@ public class MainViewModel : ViewModelBase
     {
         if (string.IsNullOrWhiteSpace(PatientForm.NewPatientName)) { PatientForm.PatientError = "Informe o nome do paciente."; return; }
         var name = PatientForm.NewPatientName.Trim();
-        if (PatientForm.IsEditMode && SelectedPatient is { } selected)
+        if (PatientForm.IsEditMode && _editingPatientId is { } pid)
         {
-            var updated = selected with { Name = name };
+            var index = -1;
+            for (var i = 0; i < Patients.Count; i++) if (Patients[i].Id == pid) { index = i; break; }
+            if (index < 0) { IsPatientFormVisible = false; return; }
+            var updated = Patients[index] with { Name = name };
             _measurementRepository.UpdatePatient(updated);
-            Patients[Patients.IndexOf(selected)] = updated;
-            SelectedPatient = updated;
+            Patients[index] = updated;
+            if (SelectedPatient?.Id == pid) SelectedPatient = updated;
         }
         else
         {
@@ -518,6 +547,7 @@ public class MainViewModel : ViewModelBase
             SelectedPatient = patient;
         }
         IsPatientFormVisible = false;
+        if (IsProfileListVisible) RefreshProfileList();
     }
 
     private async Task Backup()
@@ -566,6 +596,7 @@ public class MainViewModel : ViewModelBase
         foreach (var patient in _measurementRepository.GetPatients()) Patients.Add(patient);
         var last = _settingsRepository.GetLastPatientId();
         SelectedPatient = last != 0 && Patients.FirstOrDefault(p => p.Id == last) is { } p ? p : Patients.FirstOrDefault();
+        if (IsProfileListVisible) RefreshProfileList();
     }
 
     private async Task ExportCsv()
@@ -647,11 +678,44 @@ public class MainViewModel : ViewModelBase
         if (!string.IsNullOrWhiteSpace(directory)) _settingsRepository.SaveLastExportDirectory(directory);
     }
 
+    private void ShowNewPatientForm()
+    {
+        _editingPatientId = null;
+        PatientForm.IsEditMode = false;
+        PatientForm.NewPatientName = string.Empty;
+        PatientForm.PatientError = string.Empty;
+        IsPatientFormVisible = true;
+        PatientForm.NotifyShown();
+    }
+
+    private void OpenProfileList()
+    {
+        RefreshProfileList();
+        IsProfileListVisible = true;
+    }
+
+    private void RefreshProfileList()
+    {
+        var activeId = SelectedPatient?.Id;
+        ProfileList.Profiles.Clear();
+        foreach (var patient in _measurementRepository.GetPatients())
+            ProfileList.Profiles.Add(new PatientProfileItem(patient, patient.Id == activeId));
+        ProfileList.SelectedProfile = ProfileList.Profiles.FirstOrDefault(x => x.IsActive) ?? ProfileList.Profiles.FirstOrDefault();
+    }
+
+    private void ActivatePatient()
+    {
+        if (ProfileList.SelectedProfile is not { } item) return;
+        SelectedPatient = item.Patient;
+        RefreshProfileList();
+    }
+
     private void EditPatient()
     {
-        if (SelectedPatient is null) return;
+        if (ProfileList.SelectedProfile is not { } item) return;
+        _editingPatientId = item.Patient.Id;
         PatientForm.IsEditMode = true;
-        PatientForm.NewPatientName = SelectedPatient.Name;
+        PatientForm.NewPatientName = item.Patient.Name;
         PatientForm.PatientError = string.Empty;
         IsPatientFormVisible = true;
         PatientForm.NotifyShown();
@@ -659,10 +723,15 @@ public class MainViewModel : ViewModelBase
 
     private void DeletePatient()
     {
-        if (SelectedPatient is null || Patients.Count <= 1) { PatientForm.PatientError = "Mantenha ao menos um paciente cadastrado."; return; }
-        PatientForm.PatientError = string.Empty;
+        if (ProfileList.SelectedProfile is not { } item) return;
+        if (ProfileList.Profiles.Count <= 1)
+        {
+            ShowMessage("Mantenha ao menos um paciente cadastrado.");
+            return;
+        }
+        _pendingDeletePatientId = item.Patient.Id;
         _pendingConfirmation = ConfirmationAction.DeletePatient;
-        ConfirmMessage = $"Excluir o paciente \"{SelectedPatient.Name}\" e todas as suas medições?";
+        ConfirmMessage = $"Excluir o paciente \"{item.Patient.Name}\" e todas as suas medições?";
         IsConfirmDialogVisible = true;
     }
 
@@ -680,11 +749,12 @@ public class MainViewModel : ViewModelBase
                 }
                 break;
             case ConfirmationAction.DeletePatient:
-                if (SelectedPatient is { } patient)
+                if (_pendingDeletePatientId is { } patientId)
                 {
-                    _measurementRepository.DeletePatient(patient.Id);
-                    Patients.Remove(patient);
-                    SelectedPatient = Patients.FirstOrDefault();
+                    _measurementRepository.DeletePatient(patientId);
+                    ReloadPatients();
+                    ReloadMeasurements();
+                    RefreshProfileList();
                 }
                 break;
         }

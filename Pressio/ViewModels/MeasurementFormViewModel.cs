@@ -25,6 +25,9 @@ public sealed class MeasurementFormViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> SaveCommand { get; }
     public ReactiveCommand<Unit, Unit> CancelCommand { get; }
 
+    // true no mobile: os botões de ação ficam no cabeçalho (Não no rodapé), para o teclado não cobri-los.
+    public bool IsMobileLayout { get; set; }
+
     public IReadOnlyList<string> MedicationOptions { get; } = new[] { "Não informado", "Antes da medicação", "Depois da medicação", "Não se aplica" };
     public ObservableCollection<ContextOption> ContextOptions { get; } = new();
     public IReadOnlyList<string> ArmOptions { get; } = new[] { "Não informado", "Direito", "Esquerdo" };
