@@ -904,7 +904,8 @@ public class MainViewModel : ViewModelBase
             var message = "" + item.DisplayTime + " — hora de aferir a pressão" + (string.IsNullOrWhiteSpace(item.Note) ? "" : "\n" + item.Note);
             ReminderNoticeMessage = message;
             IsReminderNoticeVisible = true;
-            _ = Notifications.Service.ShowNowAsync("Pressio", message);
+            if (!Notifications.Service.SupportsScheduledNotifications)
+                _ = Notifications.Service.ShowNowAsync("Pressio", message);
         }
     }
 

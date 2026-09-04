@@ -35,6 +35,8 @@ public sealed class IosNotificationService : INotificationService
         return Task.CompletedTask;
     }
 
+    public bool SupportsScheduledNotifications => true;
+
     public Task ShowNowAsync(string title, string message)
     {
         EnsureInitialized();

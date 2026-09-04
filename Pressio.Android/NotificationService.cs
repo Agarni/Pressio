@@ -40,6 +40,8 @@ public sealed class AndroidNotificationService : INotificationService
         return Task.CompletedTask;
     }
 
+    public bool SupportsScheduledNotifications => true;
+
     public Task ShowNowAsync(string title, string message)
     {
         Post((int)(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % int.MaxValue), title, message);

@@ -10,6 +10,7 @@ public sealed class DesktopNotificationService : INotificationService
 {
     public Task ScheduleAsync(Reminder reminder) => Task.CompletedTask;
     public Task CancelAsync(long reminderId) => Task.CompletedTask;
+    public bool SupportsScheduledNotifications => false;
 
     public Task ShowNowAsync(string title, string message)
     {
