@@ -23,6 +23,9 @@ public sealed class SettingsRepository
     public string GetMeasurementDisplayFormat() => Get("MeasurementDisplayFormat", "13/8");
     public string? GetLastExportDirectory() => Get("LastExportDirectory", string.Empty) is { Length: > 0 } dir ? dir : null;
     public string? GetLastSyncDirectory() => Get("LastSyncDirectory", string.Empty) is { Length: > 0 } dir ? dir : null;
+    public string GetSupabaseUrl() => Get("SupabaseUrl", string.Empty);
+    public string GetSupabaseAnonKey() => Get("SupabaseAnonKey", string.Empty);
+    public void SaveSupabase(string url, string anonKey) { Set("SupabaseUrl", url); Set("SupabaseAnonKey", anonKey); }
     public void SaveAppearance(string appearance, string primaryColor)
     {
         Set("Appearance", appearance);

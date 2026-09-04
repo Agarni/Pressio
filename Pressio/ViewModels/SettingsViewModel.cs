@@ -15,6 +15,10 @@ public sealed class SettingsViewModel : ViewModelBase
         RestoreCommand = ReactiveCommand.Create(() => RestoreRequested?.Invoke());
         SelectPrimaryColorCommand = ReactiveCommand.Create<string>(color => SelectedPrimaryColor = color);
         ChooseDirectoryCommand = ReactiveCommand.Create(() => ChooseDirectoryRequested?.Invoke());
+        SaveSupabaseCommand = ReactiveCommand.Create(() => SaveSupabaseRequested?.Invoke());
+        SignInCommand = ReactiveCommand.Create(() => SignInRequested?.Invoke());
+        SignUpCommand = ReactiveCommand.Create(() => SignUpRequested?.Invoke());
+        SignOutCommand = ReactiveCommand.Create(() => SignOutRequested?.Invoke());
         SyncNowCommand = ReactiveCommand.Create(() => SyncRequested?.Invoke());
     }
 
@@ -23,6 +27,10 @@ public sealed class SettingsViewModel : ViewModelBase
     public event Action? BackupRequested;
     public event Action? RestoreRequested;
     public event Action? ChooseDirectoryRequested;
+    public event Action? SaveSupabaseRequested;
+    public event Action? SignInRequested;
+    public event Action? SignUpRequested;
+    public event Action? SignOutRequested;
     public event Action? SyncRequested;
 
     public ReactiveCommand<Unit, Unit> ApplyCommand { get; }
@@ -31,6 +39,10 @@ public sealed class SettingsViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> RestoreCommand { get; }
     public ReactiveCommand<string, Unit> SelectPrimaryColorCommand { get; }
     public ReactiveCommand<Unit, Unit> ChooseDirectoryCommand { get; }
+    public ReactiveCommand<Unit, Unit> SaveSupabaseCommand { get; }
+    public ReactiveCommand<Unit, Unit> SignInCommand { get; }
+    public ReactiveCommand<Unit, Unit> SignUpCommand { get; }
+    public ReactiveCommand<Unit, Unit> SignOutCommand { get; }
     public ReactiveCommand<Unit, Unit> SyncNowCommand { get; }
 
     public IReadOnlyList<string> AppearanceOptions { get; } = new[] { "Claro", "Escuro" };
@@ -54,4 +66,22 @@ public sealed class SettingsViewModel : ViewModelBase
 
     private string _syncStatus = string.Empty;
     public string SyncStatus { get => _syncStatus; set => this.RaiseAndSetIfChanged(ref _syncStatus, value); }
+
+    private string _supabaseUrl = string.Empty;
+    public string SupabaseUrl { get => _supabaseUrl; set => this.RaiseAndSetIfChanged(ref _supabaseUrl, value); }
+
+    private string _supabaseAnonKey = string.Empty;
+    public string SupabaseAnonKey { get => _supabaseAnonKey; set => this.RaiseAndSetIfChanged(ref _supabaseAnonKey, value); }
+
+    private string _authEmail = string.Empty;
+    public string AuthEmail { get => _authEmail; set => this.RaiseAndSetIfChanged(ref _authEmail, value); }
+
+    private string _authPassword = string.Empty;
+    public string AuthPassword { get => _authPassword; set => this.RaiseAndSetIfChanged(ref _authPassword, value); }
+
+    private bool _isAuthenticated;
+    public bool IsAuthenticated { get => _isAuthenticated; set => this.RaiseAndSetIfChanged(ref _isAuthenticated, value); }
+
+    private string _authUserEmail = string.Empty;
+    public string AuthUserEmail { get => _authUserEmail; set => this.RaiseAndSetIfChanged(ref _authUserEmail, value); }
 }

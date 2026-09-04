@@ -55,6 +55,7 @@ public class MainViewModel : ViewModelBase
     private readonly SettingsRepository _settingsRepository = new();
     private readonly ReminderRepository _reminderRepository = new();
     private SyncService _syncService = null!;
+    private readonly SupabaseClient _supabase = new();
     private Patient? _selectedPatient;
     private bool _isPatientFormVisible;
     private string _exportStatus = string.Empty;
@@ -264,6 +265,10 @@ public class MainViewModel : ViewModelBase
         Settings.BackupRequested += () => { _ = Backup(); };
         Settings.RestoreRequested += () => { _ = Restore(); };
         Settings.ChooseDirectoryRequested += () => { _ = ChooseSyncDirectory(); };
+        Settings.SaveSupabaseRequested += SaveSupabaseConfig;
+        Settings.SignInRequested += () => _ = SignInAsync();
+        Settings.SignUpRequested += () => _ = SignUpAsync();
+        Settings.SignOutRequested += SignOut;
         Settings.SyncRequested += SyncNow;
         _syncService = new SyncService(_measurementRepository, _reminderRepository, _settingsRepository, _settingsRepository.GetOrCreateSyncDeviceId());
         ShowAboutCommand = ReactiveCommand.Create(() => { _isAboutSplash = false; this.RaisePropertyChanged(nameof(IsAboutCloseVisible)); IsAboutVisible = true; });
@@ -322,6 +327,9 @@ public class MainViewModel : ViewModelBase
         Settings.SelectedPrimaryColor = _settingsRepository.GetPrimaryColor();
         Settings.SelectedDisplayFormat = _settingsRepository.GetMeasurementDisplayFormat();
         Settings.SyncDirectory = _settingsRepository.GetLastSyncDirectory() ?? string.Empty;
+        Settings.SupabaseUrl = _settingsRepository.GetSupabaseUrl();
+        Settings.SupabaseAnonKey = _settingsRepository.GetSupabaseAnonKey();
+        _supabase.Configure(Settings.SupabaseUrl, Settings.SupabaseAnonKey);
         BloodPressureMeasurement.UseShorthandFormat = Settings.SelectedDisplayFormat != "130/80";
         App.ApplyAppearance(Settings.SelectedAppearance, Settings.SelectedPrimaryColor);
     }
@@ -347,9 +355,59 @@ public class MainViewModel : ViewModelBase
 
     private void SyncNow()
     {
-        var dir = _settingsRepository.GetLastSyncDirectory();
-        if (string.IsNullOrWhiteSpace(dir)) { SetSyncError("Escolha primeiro a pasta de sincronização."); return; }
-        _ = SyncNowInteraction.Handle(Unit.Default);
+        if (!_supabase.IsAuthenticated) { SetSyncError("Entre com sua conta (Configurações → Sincronização) para sincronizar na nuvem."); return; }
+        _ = SyncCloudAsync();
+    }
+
+    private async Task SyncCloudAsync()
+    {
+        try
+        {
+            var remote = await _supabase.FetchSnapshotAsync();
+            var mergedJson = ApplyRemoteSync(remote);
+            await _supabase.SaveSnapshotAsync(mergedJson);
+        }
+        catch (Exception ex)
+        {
+            SetSyncError("Falha ao sincronizar: " + ex.Message);
+        }
+    }
+
+    private void SaveSupabaseConfig()
+    {
+        _settingsRepository.SaveSupabase(Settings.SupabaseUrl, Settings.SupabaseAnonKey);
+        _supabase.Configure(Settings.SupabaseUrl, Settings.SupabaseAnonKey);
+        Settings.SyncStatus = "Dados da nuvem salvos.";
+    }
+
+    private async Task SignUpAsync()
+    {
+        var result = await _supabase.SignUpAsync(Settings.AuthEmail, Settings.AuthPassword);
+        if (result.Success && result.NeedsEmailConfirmation) Settings.SyncStatus = "Conta criada! Confirme seu e-mail e depois entre.";
+        else if (result.Success) ApplyAuth();
+        else Settings.SyncStatus = result.Error ?? "Não foi possível criar a conta.";
+    }
+
+    private async Task SignInAsync()
+    {
+        var result = await _supabase.SignInAsync(Settings.AuthEmail, Settings.AuthPassword);
+        if (result.Success) ApplyAuth();
+        else Settings.SyncStatus = result.Error ?? "Não foi possível entrar.";
+    }
+
+    private void ApplyAuth()
+    {
+        Settings.IsAuthenticated = _supabase.IsAuthenticated;
+        Settings.AuthUserEmail = _supabase.Email ?? string.Empty;
+        Settings.SyncStatus = "Conectado: " + Settings.AuthUserEmail;
+    }
+
+    private void SignOut()
+    {
+        _supabase.ClearSession();
+        Settings.IsAuthenticated = false;
+        Settings.AuthUserEmail = string.Empty;
+        Settings.SyncStatus = "Sessão encerrada.";
     }
 
     public string BuildLocalSyncJson() => _syncService.Serialize(_syncService.BuildLocalSnapshot());
