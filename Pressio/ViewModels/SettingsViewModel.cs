@@ -61,9 +61,6 @@ public sealed class SettingsViewModel : ViewModelBase
     private string _syncDirectory = string.Empty;
     public string SyncDirectory { get => _syncDirectory; set => this.RaiseAndSetIfChanged(ref _syncDirectory, value); }
 
-    private string _syncStatus = string.Empty;
-    public string SyncStatus { get => _syncStatus; set => this.RaiseAndSetIfChanged(ref _syncStatus, value); }
-
     private string _supabaseUrl = string.Empty;
     public string SupabaseUrl { get => _supabaseUrl; set => this.RaiseAndSetIfChanged(ref _supabaseUrl, value); }
 

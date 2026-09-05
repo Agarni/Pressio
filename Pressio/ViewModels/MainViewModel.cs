@@ -423,7 +423,6 @@ public class MainViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(dir)) return;
         _settingsRepository.SaveLastSyncDirectory(dir);
         Settings.SyncDirectory = dir;
-        Settings.SyncStatus = string.Empty;
     }
 
     private void SyncNow()
@@ -469,9 +468,9 @@ public class MainViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            Settings.SyncStatus = "Falha ao sincronizar: " + ex.Message;
-            if (showResult) ShowMessage(Settings.SyncStatus);
-            else { SetSyncBanner(Settings.SyncStatus, isError: true); FinishStartupSplash(); }
+            var msg = "Falha ao sincronizar: " + ex.Message;
+            if (showResult) ShowMessage(msg);
+            else { SetSyncBanner(msg, isError: true); FinishStartupSplash(); }
         }
     }
 
@@ -479,29 +478,29 @@ public class MainViewModel : ViewModelBase
     {
         _settingsRepository.SaveSupabase(Settings.SupabaseUrl, Settings.SupabaseAnonKey);
         _supabase.Configure(Settings.SupabaseUrl, Settings.SupabaseAnonKey);
-        Settings.SyncStatus = "Dados da nuvem salvos.";
+        Notify("Dados da nuvem salvos.", "Sincronização");
     }
 
     private async Task SignUpAsync()
     {
         var result = await _supabase.SignUpAsync(Settings.AuthEmail, Settings.AuthPassword);
-        if (result.Success && result.NeedsEmailConfirmation) Settings.SyncStatus = "Conta criada! Confirme seu e-mail e depois entre.";
+        if (result.Success && result.NeedsEmailConfirmation) Notify("Conta criada! Confirme seu e-mail e depois entre.", "Criar conta");
         else if (result.Success) ApplyAuth();
-        else Settings.SyncStatus = result.Error ?? "Não foi possível criar a conta.";
+        else Notify(result.Error ?? "Não foi possível criar a conta.", "Criar conta");
     }
 
     private async Task SignInAsync()
     {
         var result = await _supabase.SignInAsync(Settings.AuthEmail, Settings.AuthPassword);
         if (result.Success) ApplyAuth();
-        else Settings.SyncStatus = result.Error ?? "Não foi possível entrar.";
+        else Notify(result.Error ?? "Não foi possível entrar.", "Entrar");
     }
 
     private void ApplyAuth()
     {
         Settings.IsAuthenticated = _supabase.IsAuthenticated;
         Settings.AuthUserEmail = _supabase.Email ?? string.Empty;
-        Settings.SyncStatus = "Conectado: " + Settings.AuthUserEmail;
+        Notify("Conectado: " + Settings.AuthUserEmail, "Sincronização");
         _settingsRepository.SaveAuthSession(_supabase.SerializeSession());
         _settingsRepository.SaveRememberedEmail(Settings.AuthEmail);
     }
@@ -512,7 +511,7 @@ public class MainViewModel : ViewModelBase
         _settingsRepository.ClearAuthSession();
         Settings.IsAuthenticated = false;
         Settings.AuthUserEmail = string.Empty;
-        Settings.SyncStatus = "Sessão encerrada.";
+        Notify("Sessão encerrada.", "Sincronização");
     }
 
     public string BuildLocalSyncJson() => _syncService.Serialize(_syncService.BuildLocalSnapshot());
@@ -521,20 +520,16 @@ public class MainViewModel : ViewModelBase
     public string ApplyRemoteSync(string? remoteJson, bool showMessage = true)
     {
         var merged = _syncService.ApplyRemote(remoteJson);
-        Settings.SyncStatus = $"Sincronizado às {DateTime.Now:HH:mm} — {merged.Patients.Count} usuários, {merged.Measurements.Count} medições, {merged.Reminders.Count} lembretes.";
+        var msg = $"Sincronizado às {DateTime.Now:HH:mm} — {merged.Patients.Count} usuários, {merged.Measurements.Count} medições, {merged.Reminders.Count} lembretes.";
         ReloadPatients();
         ReloadMeasurements();
         ReloadReminders();
         RescheduleEnabledReminders();
-        if (showMessage) ShowMessage(Settings.SyncStatus);
+        if (showMessage) ShowMessage(msg);
         return _syncService.Serialize(merged);
     }
 
-    public void SetSyncError(string message)
-    {
-        Settings.SyncStatus = message;
-        ShowMessage(message);
-    }
+    public void SetSyncError(string message) => ShowMessage(message);
 
     // Notificação in-app via DialogService (funciona em todas as plataformas, incl. mobile).
     public void ShowMessage(string message) => _ = Dialog.ShowInfoAsync("Pressio", message);
