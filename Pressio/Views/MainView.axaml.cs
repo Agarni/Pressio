@@ -15,6 +15,7 @@ public partial class MainView : UserControl
 {
     private bool _interactionsRegistered;
     private IStorageFolder? _syncFolder;
+    private IStorageFile? _lastExportFile;
 
     public MainView()
     {
@@ -61,21 +62,26 @@ public partial class MainView : UserControl
                     new FilePickerFileType(ctx.Input.Kind) { Patterns = new[] { $"*{ctx.Input.Extension}" } }
                 }
             });
+            _lastExportFile = file;
             ctx.SetOutput(file?.TryGetLocalPath());
         });
 
         vm.OpenExportInteraction.RegisterHandler(async ctx =>
         {
             var topLevel = TopLevel.GetTopLevel(this);
-            if (topLevel?.StorageProvider is not { } provider || topLevel.Launcher is not { } launcher || string.IsNullOrWhiteSpace(ctx.Input))
-            {
-                ctx.SetOutput(false);
-                return;
-            }
+            if (topLevel?.Launcher is not { } launcher) { ctx.SetOutput(false); return; }
             try
             {
-                var file = await provider.TryGetFileFromPathAsync(ctx.Input);
-                ctx.SetOutput(file is not null && await launcher.LaunchFileAsync(file));
+                // No iOS o caminho salvo pelo document picker pode não ser re-resolvido;
+                // usamos o IStorageFile do próprio save (último export) e, como fallback,
+                // tentamos resolver o caminho (desktop).
+                var item = _lastExportFile;
+                if (item is null && topLevel.StorageProvider is { } provider && !string.IsNullOrWhiteSpace(ctx.Input))
+                    item = await provider.TryGetFileFromPathAsync(ctx.Input);
+                if (item is null) { ctx.SetOutput(false); return; }
+                var ok = await launcher.LaunchFileAsync(item);
+                if (!ok) ok = await launcher.LaunchUriAsync(item.Path);
+                ctx.SetOutput(ok);
             }
             catch
             {
