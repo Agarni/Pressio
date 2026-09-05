@@ -64,24 +64,23 @@ public partial class MainView : UserControl
             ctx.SetOutput(file?.TryGetLocalPath());
         });
 
-        vm.ConfirmOpenInteraction.RegisterHandler(async ctx =>
+        vm.OpenExportInteraction.RegisterHandler(async ctx =>
         {
-            if (TopLevel.GetTopLevel(this) is not Window owner) { ctx.SetOutput(false); return; }
-
-            var panel = new StackPanel { Margin = new Thickness(20), Spacing = 16 };
-            panel.Children.Add(new TextBlock { Text = ctx.Input, TextWrapping = TextWrapping.Wrap, FontWeight = FontWeight.SemiBold });
-            var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8 };
-            var no = new Button { Content = "Agora não", Classes = { "secondary-button" } };
-            var yes = new Button { Content = "Abrir PDF", Classes = { "primary-button" } };
-            buttons.Children.Add(no);
-            buttons.Children.Add(yes);
-            panel.Children.Add(buttons);
-
-            var dialog = new Window { Width = 380, Height = 175, CanResize = false, Title = "Pressio", Content = panel };
-            yes.Click += (_, _) => dialog.Close(true);
-            no.Click += (_, _) => dialog.Close(false);
-
-            ctx.SetOutput(await dialog.ShowDialog<bool>(owner));
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel?.StorageProvider is not { } provider || topLevel.Launcher is not { } launcher || string.IsNullOrWhiteSpace(ctx.Input))
+            {
+                ctx.SetOutput(false);
+                return;
+            }
+            try
+            {
+                var file = await provider.TryGetFileFromPathAsync(ctx.Input);
+                ctx.SetOutput(file is not null && await launcher.LaunchFileAsync(file));
+            }
+            catch
+            {
+                ctx.SetOutput(false);
+            }
         });
 
         vm.OpenFileInteraction.RegisterHandler(async ctx =>

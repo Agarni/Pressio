@@ -122,6 +122,7 @@ public class MainViewModel : ViewModelBase
     public MeasurementFormViewModel MeasurementForm { get; } = new();
     public SettingsViewModel Settings { get; } = new();
     public ProfileListViewModel ProfileList { get; } = new();
+    public DialogService Dialog { get; } = new();
     public ObservableCollection<BloodPressureMeasurement> Measurements { get; } = new();
     public ObservableCollection<Patient> Patients { get; } = new();
     public Patient? SelectedPatient
@@ -238,7 +239,7 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> BackupCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> RestoreCommand { get; private set; } = null!;
     public Interaction<ExportFileRequest, string?> ExportFileInteraction { get; } = new();
-    public Interaction<string, bool> ConfirmOpenInteraction { get; } = new();
+    public Interaction<string, bool> OpenExportInteraction { get; } = new();
     public Interaction<Unit, string?> OpenFileInteraction { get; } = new();
     public Interaction<Unit, string?> FolderPickerInteraction { get; } = new();
     public Interaction<Unit, Unit> SyncNowInteraction { get; } = new();
@@ -692,6 +693,7 @@ public class MainViewModel : ViewModelBase
         File.WriteAllLines(path, rows);
         SaveExportDirectory(path);
         ExportStatus = $"Relatório CSV salvo em: {path}{(truncated ? " (últimos 30 registros)" : "")}";
+        await ConfirmOpenExport(path);
     }
 
     private async Task ExportPdf()
@@ -703,8 +705,7 @@ public class MainViewModel : ViewModelBase
         PdfReportService.Export(path, SelectedPatient, report, ReportDescription(report), truncated);
         SaveExportDirectory(path);
         ExportStatus = $"Relatório PDF salvo em: {path}{(truncated ? " (últimos 30 registros)" : "")}";
-        var open = await ConfirmOpenInteraction.Handle("O relatório PDF foi gerado. Deseja abri-lo com o aplicativo padrão?").FirstAsync();
-        if (open) TryOpenFile(path);
+        await ConfirmOpenExport(path);
     }
 
     private async Task ExportLetter()
@@ -716,14 +717,16 @@ public class MainViewModel : ViewModelBase
         PdfReportService.ExportDoctorLetter(path, SelectedPatient, report, ReportDescription(report));
         SaveExportDirectory(path);
         ExportStatus = $"Carta ao médico salva em: {path}{(truncated ? " (últimos 30 registros)" : "")}";
-        var open = await ConfirmOpenInteraction.Handle("A carta ao médico foi gerada. Deseja abri-la com o aplicativo padrão?").FirstAsync();
-        if (open) TryOpenFile(path);
+        await ConfirmOpenExport(path);
     }
 
-    private void TryOpenFile(string path)
+    // Pergunta se o usuário quer abrir o arquivo gerado com o aplicativo padrão do sistema
+    // (funciona no desktop e no mobile; abre via Launcher).
+    private async Task ConfirmOpenExport(string path)
     {
-        try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
-        catch { ExportStatus = "Não foi possível abrir o arquivo automaticamente."; }
+        if (!await Dialog.ConfirmAsync("Abrir arquivo", "O arquivo foi gerado. Deseja abri-lo com o aplicativo padrão?", "Abrir", "Mais tarde")) return;
+        var ok = await OpenExportInteraction.Handle(path).FirstAsync();
+        if (!ok) ExportStatus = "Não foi possível abrir o arquivo automaticamente.";
     }
 
     private (List<BloodPressureMeasurement> Items, bool Truncated) BuildReportSet()

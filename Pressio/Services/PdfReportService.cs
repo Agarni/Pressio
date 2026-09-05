@@ -170,7 +170,7 @@ public static class PdfReportService
 
         var relevant = BuildRelevantReadings(ordered);
         var cols = new (string Title, float W)[] {
-            ("Data e hora", 104f), ("Pressão", 64f), ("Classificação", 92f), ("Medicação", 82f), ("Observação", width - 104f - 64f - 92f - 82f)
+            ("Data e hora", 104f), ("Pressão", 64f), ("Classificação", 122f), ("Medicação", 78f), ("Observação", width - 104f - 64f - 122f - 78f)
         };
         y = DrawTableHeader(canvas, cols, y, width, labelFont, text, headerBg);
         for (var i = 0; i < relevant.Count; i++)
@@ -190,8 +190,9 @@ public static class PdfReportService
             var catPaint = Paint(SKColor.Parse(BloodPressureClassification.Color(m.Category)));
             canvas.Save();
             canvas.ClipRect(new SKRect(cx, y - 13, cx + cols[2].W, y + 4));
-            canvas.DrawRoundRect(cx + 4, y - 10, Math.Min(88f, cols[2].W - 8) * 0.55f + 12f, 14, 4, 4, catPaint);
-            canvas.DrawText(m.CategoryLabel, cx + 9, y, smallFont, Paint(SKColor.Parse("#FFFFFF")));
+            var pillW = Math.Min(smallFont.MeasureText(m.CategoryLabel) + 14f, cols[2].W - 8f);
+            canvas.DrawRoundRect(cx + 4, y - 10, pillW, 14, 4, 4, catPaint);
+            canvas.DrawText(m.CategoryLabel, cx + 11, y, smallFont, Paint(SKColor.Parse("#FFFFFF")));
             canvas.Restore();
             cx += cols[2].W;
             DrawCell(canvas, DescribeMedication(m.MedicationTiming), cols[3].W, ref cx, y, smallFont, muted);
