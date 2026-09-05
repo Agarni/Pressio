@@ -16,14 +16,12 @@
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
-    <!-- Workaround para falha de carregamento AOT observada com Xcode 26.6/.NET iOS. -->
+    <!-- Workaround para falha de carregamento AOT observada com Xcode 26.6/.NET iOS.
+         Mesmo cueando a vinculação de AOT, alguns módulos (ex.: ReactiveUI.Avalonia) não
+         carregam no device em modo aot-only; usar o interpretador evita o crash na abertura. -->
+    <UseInterpreter>true</UseInterpreter>
     <MtouchNoSymbolStrip>true</MtouchNoSymbolStrip>
-    <!-- Mantém todo o código gerenciado (sem trim): o app usa reflexão (ViewLocator, ReactiveUI,
-         JsonSerializer). O AOT continua gerando nativo para a velocidade; só desativa a poda. -->
     <MtouchLink>SdkOnly</MtouchLink>
-    <!-- Se ainda assim houver código reflexivo/dinâmico que não roda em AOT puro, o runtime
-         cai para o interpretador (evita o crash nativo na inicialização). -->
-    <MtouchExtraArgs>--interp</MtouchExtraArgs>
   </PropertyGroup>
 
   <ItemGroup>
