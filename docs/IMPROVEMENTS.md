@@ -16,6 +16,8 @@
 - ✔ **Fontes maiores no mobile** — `MobileFontSizeConverter` (textos ~1.8, controles ~1.2).
 - ✔ **Ajustes visuais** — detalhes opcionais após Medicação; engrenagem/Configurações; correção de notificação duplicada no iOS/Android.
 - ✔ **Edge-to-edge no iOS** — fundo ocupa a tela inteira (safe area tratado via `AutoSafeAreaPadding=False` + `Border` com padding do `InsetsManager.SafeAreaPadding.Top`).
+- ✔ **Classificação por faixas** — cada leitura ganha um chip colorido (Ótima/Normal/Elevada/Hipertensão 1–3, 7ª Diretriz SBC 2020), na última pressão e na coluna "Classificação" do CSV.
+- ✔ **Médias por horário** — média de pressão por Madrugada/Manhã/Tarde/Noite no dashboard, respeitando o filtro de período (Todo/Hoje/7/30 dias).
 
 ---
 
@@ -41,9 +43,7 @@ Alternativas sem servidor (candidatas, da mais simples à mais robusta):
 
 ## 2. Utilidade (valor imediato)
 
-- **Classificação por faixas** 🟢 — categorizar cada leitura (Normal, Elevada, Hipertensão estágio 1/2) conforme diretriz brasileira, com cor. Entendimento instantâneo.
 - **Insights de correlação** 🟡 — "sua média sobe X mmHg nos dias com café/estresse" usando os contextos que já capturamos (estatística simples local, sem IA).
-- **Média móvel 7/30 dias por horário** 🟢 — média por manhã/tarde/noite e antes/depois da medicação, mais útil que a média global.
 - **Relatório "carta" para o médico** 🟢 — PDF curto com faixas de normalidade + leituras mais relevantes (reusa o export existente).
 - **Lembrete pós-consulta** 🟢 — sugestão de nova rotina/aferição ao final.
 - **Histórico com mais contexto no gráfico** 🟡 — pontos coloridos por faixa e marcadores de contexto (medicação, fatores).

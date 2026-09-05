@@ -54,6 +54,9 @@ public class MainViewModel : ViewModelBase
     public string AfterMedicationSummary { get; private set; } = "—";
     public IReadOnlyList<TimeSlotInfo> TimeDistribution { get; private set; } = Array.Empty<TimeSlotInfo>();
     public IReadOnlyList<ContextCountInfo> ContextCounts { get; private set; } = Array.Empty<ContextCountInfo>();
+    public bool HasReadings => Measurements.Count > 0;
+    public PressureCategory? LastReadingCategory => Measurements.FirstOrDefault()?.Category;
+    public string LastReadingCategoryLabel => LastReadingCategory is { } c ? BloodPressureClassification.Label(c) : string.Empty;
 
     private bool _isMeasurementFormVisible;
     private readonly MeasurementRepository _measurementRepository = new();
@@ -614,8 +617,8 @@ public class MainViewModel : ViewModelBase
         var (report, truncated) = BuildReportSet();
         var path = await RequestExportPath("csv", "CSV");
         if (path is null) { ExportStatus = "Exportação cancelada."; return; }
-        var rows = new[] { "Pressão;Data e hora;Medicação;Contexto;Observação" }.Concat(report.Select(m =>
-            $"{m.DisplayValue};{m.DisplayDate};{DescribeMedicationTiming(m.MedicationTiming)};{(m.HasContext ? m.DisplayContext : "—")};{m.Notes?.Replace(';', ',') ?? string.Empty}"));
+        var rows = new[] { "Pressão;Data e hora;Medicação;Classificação;Contexto;Observação" }.Concat(report.Select(m =>
+            $"{m.DisplayValue};{m.DisplayDate};{DescribeMedicationTiming(m.MedicationTiming)};{m.CategoryLabel};{(m.HasContext ? m.DisplayContext : "—")};{m.Notes?.Replace(';', ',') ?? string.Empty}"));
         File.WriteAllLines(path, rows);
         SaveExportDirectory(path);
         ExportStatus = $"Relatório CSV salvo em: {path}{(truncated ? " (últimos 30 registros)" : "")}";
@@ -889,6 +892,9 @@ public class MainViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(AfterMedicationSummary));
         this.RaisePropertyChanged(nameof(TimeDistribution));
         this.RaisePropertyChanged(nameof(ContextCounts));
+        this.RaisePropertyChanged(nameof(HasReadings));
+        this.RaisePropertyChanged(nameof(LastReadingCategory));
+        this.RaisePropertyChanged(nameof(LastReadingCategoryLabel));
     }
 
     private static string SummarizeByMedication(IReadOnlyList<BloodPressureMeasurement> items, MedicationTiming timing)
@@ -902,11 +908,20 @@ public class MainViewModel : ViewModelBase
 
     private static IReadOnlyList<TimeSlotInfo> BuildTimeDistribution(IReadOnlyList<BloodPressureMeasurement> items) => new[]
     {
-        new TimeSlotInfo("Madrugada", items.Count(x => x.MeasuredAt.Hour < 6)),
-        new TimeSlotInfo("Manhã", items.Count(x => x.MeasuredAt.Hour >= 6 && x.MeasuredAt.Hour < 12)),
-        new TimeSlotInfo("Tarde", items.Count(x => x.MeasuredAt.Hour >= 12 && x.MeasuredAt.Hour < 18)),
-        new TimeSlotInfo("Noite", items.Count(x => x.MeasuredAt.Hour >= 18)),
+        BuildSlot("Madrugada", items.Where(x => x.MeasuredAt.Hour < 6)),
+        BuildSlot("Manhã", items.Where(x => x.MeasuredAt.Hour >= 6 && x.MeasuredAt.Hour < 12)),
+        BuildSlot("Tarde", items.Where(x => x.MeasuredAt.Hour >= 12 && x.MeasuredAt.Hour < 18)),
+        BuildSlot("Noite", items.Where(x => x.MeasuredAt.Hour >= 18)),
     };
+
+    private static TimeSlotInfo BuildSlot(string label, IEnumerable<BloodPressureMeasurement> subset)
+    {
+        var list = subset.ToList();
+        if (list.Count == 0) return new TimeSlotInfo(label, 0, "—");
+        var systolic = (int)Math.Round(list.Average(x => x.Systolic), MidpointRounding.AwayFromZero);
+        var diastolic = (int)Math.Round(list.Average(x => x.Diastolic), MidpointRounding.AwayFromZero);
+        return new TimeSlotInfo(label, list.Count, BloodPressureMeasurement.Format(systolic, diastolic));
+    }
 
     private static IReadOnlyList<ContextCountInfo> BuildContextCounts(IReadOnlyList<BloodPressureMeasurement> items)
     {

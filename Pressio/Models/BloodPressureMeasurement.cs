@@ -46,6 +46,8 @@ public sealed record BloodPressureMeasurement(
         : $"{systolic}/{diastolic}";
 
     public string DisplayValue => Format(Systolic, Diastolic);
+    public PressureCategory Category => BloodPressureClassification.Classify(Systolic, Diastolic);
+    public string CategoryLabel => BloodPressureClassification.Label(Category);
     public string DisplayDate => MeasuredAt.ToString("dd/MM/yyyy HH:mm");
     public string DisplayNotes => string.IsNullOrWhiteSpace(Notes) ? "Sem observação" : Notes;
     public bool HasContext => Context != MeasurementContext.None;
