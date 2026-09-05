@@ -7,7 +7,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-CONFIG="${CONFIG:-Debug}"
+CONFIG="${CONFIG:-Release}"
 RID=ios-arm64
 
 UDID="${1:-$(xcrun devicectl list devices 2>/dev/null | rg -o 'D0ACBB72-[0-9A-F-]+' | head -1 || true)}"
