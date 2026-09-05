@@ -234,6 +234,7 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> ShowProfileListCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ExportCsvCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ExportPdfCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> ExportLetterCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> BackupCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> RestoreCommand { get; private set; } = null!;
     public Interaction<ExportFileRequest, string?> ExportFileInteraction { get; } = new();
@@ -356,6 +357,7 @@ public class MainViewModel : ViewModelBase
         }
         ExportCsvCommand = ReactiveCommand.CreateFromTask(ExportCsv);
         ExportPdfCommand = ReactiveCommand.CreateFromTask(ExportPdf);
+        ExportLetterCommand = ReactiveCommand.CreateFromTask(ExportLetter);
         BackupCommand = ReactiveCommand.CreateFromTask(Backup);
         RestoreCommand = ReactiveCommand.CreateFromTask(Restore);
         LoadAppSettings();
@@ -702,6 +704,19 @@ public class MainViewModel : ViewModelBase
         SaveExportDirectory(path);
         ExportStatus = $"Relatório PDF salvo em: {path}{(truncated ? " (últimos 30 registros)" : "")}";
         var open = await ConfirmOpenInteraction.Handle("O relatório PDF foi gerado. Deseja abri-lo com o aplicativo padrão?").FirstAsync();
+        if (open) TryOpenFile(path);
+    }
+
+    private async Task ExportLetter()
+    {
+        if (SelectedPatient is null || Measurements.Count == 0) { ExportStatus = "Não há medições para exportar."; return; }
+        var (report, truncated) = BuildReportSet();
+        var path = await RequestExportPath("pdf", "PDF da carta");
+        if (path is null) { ExportStatus = "Exportação cancelada."; return; }
+        PdfReportService.ExportDoctorLetter(path, SelectedPatient, report, ReportDescription(report));
+        SaveExportDirectory(path);
+        ExportStatus = $"Carta ao médico salva em: {path}{(truncated ? " (últimos 30 registros)" : "")}";
+        var open = await ConfirmOpenInteraction.Handle("A carta ao médico foi gerada. Deseja abri-la com o aplicativo padrão?").FirstAsync();
         if (open) TryOpenFile(path);
     }
 

@@ -18,6 +18,7 @@
 - ✔ **Edge-to-edge no iOS** — fundo ocupa a tela inteira (safe area tratado via `AutoSafeAreaPadding=False` + `Border` com padding do `InsetsManager.SafeAreaPadding.Top`).
 - ✔ **Classificação por faixas** — cada leitura ganha um chip colorido (Ótima/Normal/Elevada/Hipertensão 1–3, 7ª Diretriz SBC 2020), na última pressão e na coluna "Classificação" do CSV.
 - ✔ **Médias por horário** — média de pressão por Madrugada/Manhã/Tarde/Noite no dashboard, respeitando o filtro de período (Todo/Hoje/7/30 dias).
+- ✔ **Carta ao médico** — PDF curto e limpo: resumo clínico (média, última, antes/depois, por horário), distribuição por faixa, legenda das faixas (SBC) e as leituras mais relevantes.
 
 ---
 
@@ -44,7 +45,6 @@ Alternativas sem servidor (candidatas, da mais simples à mais robusta):
 ## 2. Utilidade (valor imediato)
 
 - **Insights de correlação** 🟡 — "sua média sobe X mmHg nos dias com café/estresse" usando os contextos que já capturamos (estatística simples local, sem IA).
-- **Relatório "carta" para o médico** 🟢 — PDF curto com faixas de normalidade + leituras mais relevantes (reusa o export existente).
 - **Lembrete pós-consulta** 🟢 — sugestão de nova rotina/aferição ao final.
 - **Histórico com mais contexto no gráfico** 🟡 — pontos coloridos por faixa e marcadores de contexto (medicação, fatores).
 
