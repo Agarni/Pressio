@@ -18,6 +18,9 @@ namespace Pressio.ViewModels;
 
 public class MainViewModel : ViewModelBase
 {
+    private enum SyncMode { Startup, Manual, Periodic }
+    private const int SyncIntervalMinutes = 2;
+
     public MainViewModel(bool isMobileLayout = false)
     {
         IsMobileLayout = isMobileLayout;
@@ -104,6 +107,7 @@ public class MainViewModel : ViewModelBase
     private string _splashMessage = string.Empty;
     private bool _splashMinElapsed;
     private bool _splashSyncFinished;
+    private bool _syncInProgress;
     private readonly HashSet<(long Id, DateTime Date)> _firedReminders = new();
 
     public bool IsMeasurementFormVisible
@@ -359,7 +363,10 @@ public class MainViewModel : ViewModelBase
         LoadAppSettings();
         ReloadPatients();
         ShowSplash();
-        if (_supabase.IsAuthenticated) _ = SyncCloudAsync(showResult: false);
+        if (_supabase.IsAuthenticated) _ = SyncCloudAsync(SyncMode.Startup);
+        // Sincroniza automaticamente enquanto o app fica aberto (silencioso; mostra só erro).
+        Observable.Interval(TimeSpan.FromMinutes(SyncIntervalMinutes), RxApp.MainThreadScheduler)
+            .Subscribe(_tick => { if (_supabase.IsAuthenticated) _ = SyncCloudAsync(SyncMode.Periodic); });
     }
 
     private void ShowSplash()
@@ -430,7 +437,7 @@ public class MainViewModel : ViewModelBase
     private void SyncNow()
     {
         if (!_supabase.IsAuthenticated) { SetSyncError("Entre com sua conta (Configurações → Sincronização) para sincronizar na nuvem."); return; }
-        _ = SyncCloudAsync(showResult: true);
+        _ = SyncCloudAsync(SyncMode.Manual);
     }
 
     private void SetSyncBanner(string text, bool isError)
@@ -441,16 +448,20 @@ public class MainViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(SyncInProgress));
     }
 
-    private async Task SyncCloudAsync(bool showResult)
+    private async Task SyncCloudAsync(SyncMode mode)
     {
-        var startup = !showResult;
-        if (startup) SetSyncBanner("Sincronizando dados com a nuvem…", isError: false);
+        if (_syncInProgress) return;
+        _syncInProgress = true;
+        var isStartup = mode == SyncMode.Startup;
+        var isManual = mode == SyncMode.Manual;
+        // Só o modo abrir mostra o aviso de progresso; o periódico é silencioso (mostra erro só).
+        if (isStartup) SetSyncBanner("Sincronizando dados com a nuvem…", isError: false);
         try
         {
             if (!_supabase.IsAuthenticated)
             {
                 var msg = "Sessão inválida. Faça login novamente.";
-                if (showResult) SetSyncError(msg); else { SetSyncBanner(msg, isError: true); FinishStartupSplash(); }
+                if (isManual) SetSyncError(msg); else { SetSyncBanner(msg, isError: true); FinishStartupSplash(); }
                 return;
             }
             // Garante um access token válido (renova se o anterior expirou).
@@ -458,21 +469,25 @@ public class MainViewModel : ViewModelBase
             if (!refreshed.Success)
             {
                 var msg = "Sessão expirada. Faça login novamente.";
-                if (showResult) SetSyncError(msg); else { SetSyncBanner(msg, isError: true); FinishStartupSplash(); }
+                if (isManual) SetSyncError(msg); else { SetSyncBanner(msg, isError: true); FinishStartupSplash(); }
                 return;
             }
             _settingsRepository.SaveAuthSession(_supabase.SerializeSession());
             var remote = await _supabase.FetchSnapshotAsync();
-            var mergedJson = ApplyRemoteSync(remote, showMessage: showResult);
+            var mergedJson = ApplyRemoteSync(remote, showMessage: isManual);
             await _supabase.SaveSnapshotAsync(mergedJson);
             _syncService.CompactTombstones();
-            if (startup) { FinishStartupSplash(); SetSyncBanner("", isError: false); }
+            if (isStartup) { FinishStartupSplash(); SetSyncBanner("", isError: false); }
         }
         catch (Exception ex)
         {
             var msg = "Falha ao sincronizar: " + ex.Message;
-            if (showResult) ShowMessage(msg);
+            if (isManual) ShowMessage(msg);
             else { SetSyncBanner(msg, isError: true); FinishStartupSplash(); }
+        }
+        finally
+        {
+            _syncInProgress = false;
         }
     }
 
