@@ -102,6 +102,10 @@ public class MainViewModel : ViewModelBase
     private bool _isMessageVisible;
     private string _syncNotifier = string.Empty;
     private bool _syncNotifierIsError;
+    private bool _isSplashVisible;
+    private string _splashMessage = string.Empty;
+    private bool _splashMinElapsed;
+    private bool _splashSyncFinished;
     private readonly HashSet<(long Id, DateTime Date)> _firedReminders = new();
 
     public bool IsMeasurementFormVisible
@@ -356,7 +360,38 @@ public class MainViewModel : ViewModelBase
         RestoreCommand = ReactiveCommand.CreateFromTask(Restore);
         LoadAppSettings();
         ReloadPatients();
+        ShowSplash();
         if (_supabase.IsAuthenticated) _ = SyncCloudAsync(showResult: false);
+    }
+
+    private void ShowSplash()
+    {
+        if (!IsMobileLayout) return;
+        IsSplashVisible = true;
+        SplashMessage = _supabase.IsAuthenticated ? "Sincronizando dados com a nuvem…" : string.Empty;
+        _splashMinElapsed = false;
+        _splashSyncFinished = !_supabase.IsAuthenticated;
+        Observable.Timer(TimeSpan.FromMilliseconds(1300), RxApp.MainThreadScheduler).Subscribe(_ =>
+        {
+            _splashMinElapsed = true;
+            TryDismissSplash();
+        });
+        Observable.Timer(TimeSpan.FromMilliseconds(4500), RxApp.MainThreadScheduler).Subscribe(_ =>
+        {
+            TryDismissSplash(force: true);
+        });
+    }
+
+    private void FinishStartupSplash()
+    {
+        _splashSyncFinished = true;
+        TryDismissSplash();
+    }
+
+    private void TryDismissSplash(bool force = false)
+    {
+        if (!IsMobileLayout || !IsSplashVisible) return;
+        if (force || (_splashMinElapsed && _splashSyncFinished)) IsSplashVisible = false;
     }
 
     private void LoadAppSettings()
@@ -418,7 +453,7 @@ public class MainViewModel : ViewModelBase
             if (!_supabase.IsAuthenticated)
             {
                 var msg = "Sessão inválida. Faça login novamente.";
-                if (showResult) SetSyncError(msg); else SetSyncBanner(msg, isError: true);
+                if (showResult) SetSyncError(msg); else { SetSyncBanner(msg, isError: true); FinishStartupSplash(); }
                 return;
             }
             // Garante um access token válido (renova se o anterior expirou).
@@ -426,7 +461,7 @@ public class MainViewModel : ViewModelBase
             if (!refreshed.Success)
             {
                 var msg = "Sessão expirada. Faça login novamente.";
-                if (showResult) SetSyncError(msg); else SetSyncBanner(msg, isError: true);
+                if (showResult) SetSyncError(msg); else { SetSyncBanner(msg, isError: true); FinishStartupSplash(); }
                 return;
             }
             _settingsRepository.SaveAuthSession(_supabase.SerializeSession());
@@ -434,13 +469,13 @@ public class MainViewModel : ViewModelBase
             var mergedJson = ApplyRemoteSync(remote, showMessage: showResult);
             await _supabase.SaveSnapshotAsync(mergedJson);
             _syncService.CompactTombstones();
-            if (startup) SetSyncBanner("", isError: false);
+            if (startup) { FinishStartupSplash(); SetSyncBanner("", isError: false); }
         }
         catch (Exception ex)
         {
             Settings.SyncStatus = "Falha ao sincronizar: " + ex.Message;
             if (showResult) ShowMessage(Settings.SyncStatus);
-            else SetSyncBanner(Settings.SyncStatus, isError: true);
+            else { SetSyncBanner(Settings.SyncStatus, isError: true); FinishStartupSplash(); }
         }
     }
 
@@ -509,6 +544,10 @@ public class MainViewModel : ViewModelBase
     public void ShowMessage(string message) { Message = message; IsMessageVisible = true; }
     public string Message { get => _message; set => this.RaiseAndSetIfChanged(ref _message, value); }
     public bool IsMessageVisible { get => _isMessageVisible; set => this.RaiseAndSetIfChanged(ref _isMessageVisible, value); }
+    // Splash de abertura (mobile): tela de marca que some ao terminar a sincronização inicial.
+    public bool IsSplashVisible { get => _isSplashVisible; private set => this.RaiseAndSetIfChanged(ref _isSplashVisible, value); }
+    public string SplashMessage { get => _splashMessage; set { this.RaiseAndSetIfChanged(ref _splashMessage, value); this.RaisePropertyChanged(nameof(HasSplashMessage)); } }
+    public bool HasSplashMessage => !string.IsNullOrEmpty(SplashMessage);
 
     private void SaveMeasurement()
     {

@@ -242,6 +242,17 @@
         <StackPanel Orientation="Horizontal" Spacing="8"><PathIcon Data="M19.35,10.04C18.67,6.74 15.8,4 12,4C9.11,4 6.6,5.64 5.35,8.04C2.34,8.36 0,10.91 0,14C0,17.31 2.69,20 6,20H19C21.76,20 24,17.76 24,15C24,12.36 21.95,10.22 19.35,10.04Z" Foreground="{DynamicResource PressioBannerTextBrush}" /><TextBlock Text="{Binding SyncNotifier}" FontSize="13" Foreground="{DynamicResource PressioBannerTextBrush}" /></StackPanel>
       </Border>
     </Grid>
+    <Grid Grid.RowSpan="2" IsVisible="{Binding IsSplashVisible}" Background="{DynamicResource PressioBackgroundBrush}">
+      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14">
+        <Border Width="96" Height="96" CornerRadius="24" ClipToBounds="True" HorizontalAlignment="Center"><Image Source="avares://Pressio/Assets/Icon.png" Stretch="Fill" /></Border>
+        <TextBlock Text="Pressio" FontSize="30" FontWeight="Bold" Foreground="{DynamicResource PressioTextBrush}" HorizontalAlignment="Center" />
+        <TextBlock Text="Acompanhe sua pressão arterial" FontSize="15" Foreground="{DynamicResource PressioMutedBrush}" HorizontalAlignment="Center" />
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" Margin="0,20,0,0" IsVisible="{Binding HasSplashMessage}">
+          <PathIcon Data="M19.35,10.04C18.67,6.74 15.8,4 12,4C9.11,4 6.6,5.64 5.35,8.04C2.34,8.36 0,10.91 0,14C0,17.31 2.69,20 6,20H19C21.76,20 24,17.76 24,15C24,12.36 21.95,10.22 19.35,10.04Z" Foreground="{DynamicResource PressioPrimaryBrush}" />
+          <TextBlock Text="{Binding SplashMessage}" FontSize="14" Foreground="{DynamicResource PressioMutedBrush}" />
+        </StackPanel>
+      </StackPanel>
+    </Grid>
   </Grid>
   </Border>
 </UserControl>
