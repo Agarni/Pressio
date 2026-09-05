@@ -53,6 +53,8 @@ public class MainViewModel : ViewModelBase
     public string AfterMedicationSummary { get; private set; } = "—";
     public IReadOnlyList<TimeSlotInfo> TimeDistribution { get; private set; } = Array.Empty<TimeSlotInfo>();
     public IReadOnlyList<ContextCountInfo> ContextCounts { get; private set; } = Array.Empty<ContextCountInfo>();
+    public IReadOnlyList<CorrelationInfo> Correlations { get; private set; } = Array.Empty<CorrelationInfo>();
+    public bool HasCorrelations => Correlations.Count > 0;
     public bool HasReadings => Measurements.Count > 0;
     public PressureCategory? LastReadingCategory => Measurements.FirstOrDefault()?.Category;
     public string LastReadingCategoryLabel => LastReadingCategory is { } c ? BloodPressureClassification.Label(c) : string.Empty;
@@ -934,6 +936,7 @@ public class MainViewModel : ViewModelBase
         AfterMedicationSummary = SummarizeByMedication(ordered, MedicationTiming.AfterMedication);
         TimeDistribution = BuildTimeDistribution(ordered);
         ContextCounts = BuildContextCounts(ordered);
+        Correlations = BuildCorrelations(ordered);
         if (ordered.Count == 0)
         {
             SystolicLine = new StreamGeometry();
@@ -964,6 +967,8 @@ public class MainViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(AfterMedicationSummary));
         this.RaisePropertyChanged(nameof(TimeDistribution));
         this.RaisePropertyChanged(nameof(ContextCounts));
+        this.RaisePropertyChanged(nameof(Correlations));
+        this.RaisePropertyChanged(nameof(HasCorrelations));
         this.RaisePropertyChanged(nameof(HasReadings));
         this.RaisePropertyChanged(nameof(LastReadingCategory));
         this.RaisePropertyChanged(nameof(LastReadingCategoryLabel));
@@ -1004,6 +1009,32 @@ public class MainViewModel : ViewModelBase
             if (count > 0) result.Add(new ContextCountInfo(label, count));
         }
         return result;
+    }
+
+    // Correlações simples (sem IA): diferença da média com/sem cada fator de contexto.
+    private static IReadOnlyList<CorrelationInfo> BuildCorrelations(IReadOnlyList<BloodPressureMeasurement> items)
+    {
+        var result = new List<CorrelationInfo>();
+        foreach (var (value, label) in MeasurementContextInfo.AllContexts)
+        {
+            var with = items.Where(x => (x.Context & value) != 0).ToList();
+            if (with.Count < 3) continue;
+            var without = items.Where(x => (x.Context & value) == 0).ToList();
+            if (without.Count < 3) continue;
+            var ws = (int)Math.Round(with.Average(x => x.Systolic), MidpointRounding.AwayFromZero);
+            var wd = (int)Math.Round(with.Average(x => x.Diastolic), MidpointRounding.AwayFromZero);
+            var ns = (int)Math.Round(without.Average(x => x.Systolic), MidpointRounding.AwayFromZero);
+            var nd = (int)Math.Round(without.Average(x => x.Diastolic), MidpointRounding.AwayFromZero);
+            var ds = ws - ns;
+            var dd = wd - nd;
+            if (ds == 0 && dd == 0) continue;
+            var delta = $"{(ds >= 0 ? "+" : "")}{ds}/{(dd >= 0 ? "+" : "")}{dd}";
+            var detail = $"com: {with.Count}x {BloodPressureMeasurement.Format(ws, wd)}  ·  sem: {without.Count}x {BloodPressureMeasurement.Format(ns, nd)}";
+            result.Add(new CorrelationInfo(label, delta, detail, ds > 0 || dd > 0, ds, dd));
+        }
+        return result
+            .OrderByDescending(c => Math.Max(Math.Abs(c.DeltaSys), Math.Abs(c.DeltaDia)))
+            .ToList();
     }
 
     private void ReloadReminders()
