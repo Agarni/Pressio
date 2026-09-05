@@ -7,6 +7,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using Pressio.Services;
 using Pressio.ViewModels;
 
 namespace Pressio.Views;
@@ -69,23 +70,27 @@ public partial class MainView : UserControl
         vm.OpenExportInteraction.RegisterHandler(async ctx =>
         {
             var topLevel = TopLevel.GetTopLevel(this);
-            if (topLevel?.Launcher is not { } launcher) { ctx.SetOutput(false); return; }
+            var launcher = topLevel?.Launcher;
             try
             {
-                // No iOS o caminho salvo pelo document picker pode não ser re-resolvido;
-                // usamos o IStorageFile do próprio save (último export) e, como fallback,
-                // tentamos resolver o caminho (desktop).
+                // Primeiro tenta o launcher nativo (desktop/Android); no iOS ele não abre
+                // arquivos, então cai no preview nativo (QLPreviewController).
                 var item = _lastExportFile;
-                if (item is null && topLevel.StorageProvider is { } provider && !string.IsNullOrWhiteSpace(ctx.Input))
+                if (item is null && topLevel?.StorageProvider is { } provider && !string.IsNullOrWhiteSpace(ctx.Input))
                     item = await provider.TryGetFileFromPathAsync(ctx.Input);
-                if (item is null) { ctx.SetOutput(false); return; }
-                var ok = await launcher.LaunchFileAsync(item);
-                if (!ok) ok = await launcher.LaunchUriAsync(item.Path);
-                ctx.SetOutput(ok);
+                if (item is not null && launcher is not null)
+                {
+                    if (await launcher.LaunchFileAsync(item)) { ctx.SetOutput(true); return; }
+                    if (await launcher.LaunchUriAsync(item.Path)) { ctx.SetOutput(true); return; }
+                }
+
+                var path = item?.TryGetLocalPath() ?? item?.Path?.LocalPath ?? ctx.Input;
+                ctx.SetOutput(await FilePreview.Service.PreviewAsync(path));
             }
             catch
             {
-                ctx.SetOutput(false);
+                try { ctx.SetOutput(await FilePreview.Service.PreviewAsync(ctx.Input)); }
+                catch { ctx.SetOutput(false); }
             }
         });
 
