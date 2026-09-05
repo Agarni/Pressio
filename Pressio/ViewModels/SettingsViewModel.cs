@@ -58,9 +58,6 @@ public sealed class SettingsViewModel : ViewModelBase
     private string _selectedDisplayFormat = "13/8";
     public string SelectedDisplayFormat { get => _selectedDisplayFormat; set => this.RaiseAndSetIfChanged(ref _selectedDisplayFormat, value); }
 
-    private string _exportStatus = string.Empty;
-    public string ExportStatus { get => _exportStatus; set => this.RaiseAndSetIfChanged(ref _exportStatus, value); }
-
     private string _syncDirectory = string.Empty;
     public string SyncDirectory { get => _syncDirectory; set => this.RaiseAndSetIfChanged(ref _syncDirectory, value); }
 

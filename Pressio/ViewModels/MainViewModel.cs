@@ -6,7 +6,6 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.IO;
-using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Avalonia;
@@ -71,7 +70,6 @@ public class MainViewModel : ViewModelBase
     private readonly SupabaseClient _supabase = new();
     private Patient? _selectedPatient;
     private bool _isPatientFormVisible;
-    private string _exportStatus = string.Empty;
     private BloodPressureMeasurement? _selectedMeasurement;
     private bool _editingMeasurement;
     private bool _isSettingsVisible;
@@ -98,8 +96,6 @@ public class MainViewModel : ViewModelBase
     private ReminderItem? _selectedReminder;
     private bool _isReminderNoticeVisible;
     private string _reminderNoticeMessage = string.Empty;
-    private string _message = string.Empty;
-    private bool _isMessageVisible;
     private string _syncNotifier = string.Empty;
     private bool _syncNotifierIsError;
     private bool _isSplashVisible;
@@ -150,7 +146,6 @@ public class MainViewModel : ViewModelBase
     public string NewPatientName => PatientForm.NewPatientName;
     public string PatientError => PatientForm.PatientError;
     public PatientFormViewModel PatientForm { get; } = new();
-    public string ExportStatus { get => _exportStatus; private set => this.RaiseAndSetIfChanged(ref _exportStatus, value); }
     public bool IsSettingsVisible
     {
         get => _isSettingsVisible;
@@ -258,7 +253,6 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> EditReminderCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> DeleteReminderCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> DismissReminderNoticeCommand { get; private set; } = null!;
-    public ReactiveCommand<Unit, Unit> DismissMessageCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ClearFiltersCommand { get; private set; } = null!;
 
     private void Initialize()
@@ -343,7 +337,6 @@ public class MainViewModel : ViewModelBase
         EditReminderCommand = ReactiveCommand.Create(EditReminder);
         DeleteReminderCommand = ReactiveCommand.Create(DeleteSelectedReminder);
         DismissReminderNoticeCommand = ReactiveCommand.Create(() => { IsReminderNoticeVisible = false; });
-        DismissMessageCommand = ReactiveCommand.Create(() => { IsMessageVisible = false; });
         ReminderForm.SaveRequested += SaveReminder;
         ReminderForm.CancelRequested += () => { IsReminderFormVisible = false; };
         try { Observable.Interval(TimeSpan.FromSeconds(20), RxApp.MainThreadScheduler).Subscribe(_ => CheckDueReminders()); } catch { }
@@ -543,10 +536,9 @@ public class MainViewModel : ViewModelBase
         ShowMessage(message);
     }
 
-    // Overlay in-app de mensagem (funciona em mobile; Window.ShowDialog não existe em iOS).
-    public void ShowMessage(string message) { Message = message; IsMessageVisible = true; }
-    public string Message { get => _message; set => this.RaiseAndSetIfChanged(ref _message, value); }
-    public bool IsMessageVisible { get => _isMessageVisible; set => this.RaiseAndSetIfChanged(ref _isMessageVisible, value); }
+    // Notificação in-app via DialogService (funciona em todas as plataformas, incl. mobile).
+    public void ShowMessage(string message) => _ = Dialog.ShowInfoAsync("Pressio", message);
+    public void Notify(string message, string title = "Pressio") => _ = Dialog.ShowInfoAsync(title, message);
     // Splash de abertura (mobile): tela de marca que some ao terminar a sincronização inicial.
     public bool IsSplashVisible { get => _isSplashVisible; private set => this.RaiseAndSetIfChanged(ref _isSplashVisible, value); }
     public string SplashMessage { get => _splashMessage; set { this.RaiseAndSetIfChanged(ref _splashMessage, value); this.RaisePropertyChanged(nameof(HasSplashMessage)); } }
@@ -556,7 +548,9 @@ public class MainViewModel : ViewModelBase
     {
         if (!BloodPressureParser.TryParse(MeasurementForm.BloodPressureInput, out var parsed, out var error))
         {
-            MeasurementForm.MeasurementError = error ?? "Não foi possível interpretar a pressão.";
+            var msg = error ?? "Não foi possível interpretar a pressão.";
+            MeasurementForm.MeasurementError = msg;
+            Notify(msg, "Pressão inválida");
             return;
         }
 
@@ -565,7 +559,7 @@ public class MainViewModel : ViewModelBase
         var hrText = MeasurementForm.HeartRateInput?.Trim();
         if (!string.IsNullOrEmpty(hrText))
         {
-            if (!int.TryParse(hrText, out var hr) || hr is < 20 or > 300) { MeasurementForm.MeasurementError = "Frequência cardíaca inválida (20 a 300)."; return; }
+            if (!int.TryParse(hrText, out var hr) || hr is < 20 or > 300) { var msg = "Frequência cardíaca inválida (20 a 300)."; MeasurementForm.MeasurementError = msg; Notify(msg, "Dados inválidos"); return; }
             heartRate = hr;
         }
         var context = MeasurementForm.SelectedContext();
@@ -577,7 +571,7 @@ public class MainViewModel : ViewModelBase
         }
         else
         {
-            if (SelectedPatient is null) { MeasurementForm.MeasurementError = "Cadastre ou selecione um usuário antes de salvar."; return; }
+            if (SelectedPatient is null) { var msg = "Cadastre ou selecione um usuário antes de salvar."; MeasurementForm.MeasurementError = msg; Notify(msg, "Nenhum usuário"); return; }
             var id = _measurementRepository.Add(measurement, SelectedPatient.Id);
             measurement = measurement with { Id = id };
         }
@@ -602,7 +596,7 @@ public class MainViewModel : ViewModelBase
 
     private void SavePatient()
     {
-        if (string.IsNullOrWhiteSpace(PatientForm.NewPatientName)) { PatientForm.PatientError = "Informe o nome do usuário."; return; }
+        if (string.IsNullOrWhiteSpace(PatientForm.NewPatientName)) { var msg = "Informe o nome do usuário."; PatientForm.PatientError = msg; Notify(msg, "Nome obrigatório"); return; }
         var name = PatientForm.NewPatientName.Trim();
         if (PatientForm.IsEditMode && _editingPatientId is { } pid)
         {
@@ -637,7 +631,7 @@ public class MainViewModel : ViewModelBase
     private async Task Backup()
     {
         var path = await ExportFileInteraction.Handle(new ExportFileRequest($"pressio-backup-{DateTime.Now:yyyyMMdd-HHmmss}.db", ".db", "Backup", _settingsRepository.GetLastExportDirectory())).FirstAsync();
-        if (string.IsNullOrWhiteSpace(path)) { Settings.ExportStatus = "Backup cancelado."; return; }
+        if (string.IsNullOrWhiteSpace(path)) { Notify("Backup cancelado."); return; }
         try
         {
             if (File.Exists(path)) File.Delete(path);
@@ -647,18 +641,18 @@ public class MainViewModel : ViewModelBase
             command.CommandText = $"VACUUM INTO '{path.Replace("'", "''")}'";
             command.ExecuteNonQuery();
             _settingsRepository.SaveLastExportDirectory(Path.GetDirectoryName(path) ?? string.Empty);
-            ExportStatus = $"Backup criado em: {path}";
+            Notify("Backup criado com sucesso.");
         }
         catch (Exception ex)
         {
-            Settings.ExportStatus = "Não foi possível criar o backup: " + ex.Message;
+            Notify("Não foi possível criar o backup: " + ex.Message);
         }
     }
 
     private async Task Restore()
     {
         var path = await OpenFileInteraction.Handle(Unit.Default).FirstAsync();
-        if (string.IsNullOrWhiteSpace(path)) { Settings.ExportStatus = "Restauração cancelada."; return; }
+        if (string.IsNullOrWhiteSpace(path)) { Notify("Restauração cancelada."); return; }
         try
         {
             File.Copy(path, PressioDatabase.Path, overwrite: true);
@@ -666,11 +660,11 @@ public class MainViewModel : ViewModelBase
             ReloadMeasurements();
             ReloadReminders();
             LoadAppSettings();
-            Settings.ExportStatus = "Backup restaurado com sucesso.";
+            Notify("Backup restaurado com sucesso.");
         }
         catch (Exception ex)
         {
-            Settings.ExportStatus = "Não foi possível restaurar o backup: " + ex.Message;
+            Notify("Não foi possível restaurar o backup: " + ex.Message);
         }
     }
 
@@ -684,39 +678,36 @@ public class MainViewModel : ViewModelBase
     }
 
     private async Task ExportCsv()
-    {        if (SelectedPatient is null || Measurements.Count == 0) { ExportStatus = "Não há medições para exportar."; return; }
+    {        if (SelectedPatient is null || Measurements.Count == 0) { Notify("Não há medições para exportar."); return; }
         var (report, truncated) = BuildReportSet();
         var path = await RequestExportPath("csv", "CSV");
-        if (path is null) { ExportStatus = "Exportação cancelada."; return; }
+        if (path is null) { Notify("Exportação cancelada."); return; }
         var rows = new[] { "Pressão;Data e hora;Medicação;Classificação;Contexto;Observação" }.Concat(report.Select(m =>
             $"{m.DisplayValue};{m.DisplayDate};{DescribeMedicationTiming(m.MedicationTiming)};{m.CategoryLabel};{(m.HasContext ? m.DisplayContext : "—")};{m.Notes?.Replace(';', ',') ?? string.Empty}"));
         File.WriteAllLines(path, rows);
         SaveExportDirectory(path);
-        ExportStatus = $"Relatório CSV salvo em: {path}{(truncated ? " (últimos 30 registros)" : "")}";
         await ConfirmOpenExport(path);
     }
 
     private async Task ExportPdf()
     {
-        if (SelectedPatient is null || Measurements.Count == 0) { ExportStatus = "Não há medições para exportar."; return; }
+        if (SelectedPatient is null || Measurements.Count == 0) { Notify("Não há medições para exportar."); return; }
         var (report, truncated) = BuildReportSet();
         var path = await RequestExportPath("pdf", "PDF");
-        if (path is null) { ExportStatus = "Exportação cancelada."; return; }
+        if (path is null) { Notify("Exportação cancelada."); return; }
         PdfReportService.Export(path, SelectedPatient, report, ReportDescription(report), truncated);
         SaveExportDirectory(path);
-        ExportStatus = $"Relatório PDF salvo em: {path}{(truncated ? " (últimos 30 registros)" : "")}";
         await ConfirmOpenExport(path);
     }
 
     private async Task ExportLetter()
     {
-        if (SelectedPatient is null || Measurements.Count == 0) { ExportStatus = "Não há medições para exportar."; return; }
+        if (SelectedPatient is null || Measurements.Count == 0) { Notify("Não há medições para exportar."); return; }
         var (report, truncated) = BuildReportSet();
         var path = await RequestExportPath("pdf", "PDF da carta");
-        if (path is null) { ExportStatus = "Exportação cancelada."; return; }
+        if (path is null) { Notify("Exportação cancelada."); return; }
         PdfReportService.ExportDoctorLetter(path, SelectedPatient, report, ReportDescription(report));
         SaveExportDirectory(path);
-        ExportStatus = $"Carta ao médico salva em: {path}{(truncated ? " (últimos 30 registros)" : "")}";
         await ConfirmOpenExport(path);
     }
 
@@ -726,7 +717,7 @@ public class MainViewModel : ViewModelBase
     {
         if (!await Dialog.ConfirmAsync("Abrir arquivo", "O arquivo foi gerado. Deseja abri-lo com o aplicativo padrão?", "Abrir", "Mais tarde")) return;
         var ok = await OpenExportInteraction.Handle(path).FirstAsync();
-        if (!ok) ExportStatus = "Não foi possível abrir o arquivo automaticamente.";
+        if (!ok) Notify("Não foi possível abrir o arquivo automaticamente.", "Abrir arquivo");
     }
 
     private (List<BloodPressureMeasurement> Items, bool Truncated) BuildReportSet()
