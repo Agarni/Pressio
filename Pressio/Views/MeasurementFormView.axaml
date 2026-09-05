@@ -13,7 +13,7 @@
       <StackPanel Spacing="14" Margin="20,16,20,16">
         <TextBlock Text="Digite 13/8 ou 130/80. Você pode ajustar data e horário." FontSize="{Binding IsMobileLayout, Converter={StaticResource Mob}, ConverterParameter=13;1.8}" Foreground="{DynamicResource PressioMutedBrush}" TextWrapping="Wrap" />
         <TextBox x:Name="PressureInput" Text="{Binding BloodPressureInput}" PlaceholderText="Ex.: 13/8" FontSize="{Binding IsMobileLayout, Converter={StaticResource Mob}, ConverterParameter=24;1.2}" Padding="12" />
-        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
           <StackPanel Spacing="5"><TextBlock Text="Data da aferição" FontSize="{Binding IsMobileLayout, Converter={StaticResource Mob}, ConverterParameter=12;1.8}" FontWeight="SemiBold" /><CalendarDatePicker SelectedDate="{Binding MeasurementDate}" PlaceholderText="Escolha a data" FontSize="{Binding IsMobileLayout, Converter={StaticResource Mob}, ConverterParameter=14;1.2}" /></StackPanel>
           <StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="Hora da aferição" FontSize="{Binding IsMobileLayout, Converter={StaticResource Mob}, ConverterParameter=12;1.8}" FontWeight="SemiBold" /><TimePicker SelectedTime="{Binding MeasurementTime}" ClockIdentifier="24HourClock" FontSize="{Binding IsMobileLayout, Converter={StaticResource Mob}, ConverterParameter=14;1.2}" /></StackPanel>
         </Grid>
