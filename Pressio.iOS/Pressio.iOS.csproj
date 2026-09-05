@@ -18,6 +18,9 @@
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
     <!-- Workaround para falha de carregamento AOT observada com Xcode 26.6/.NET iOS. -->
     <MtouchNoSymbolStrip>true</MtouchNoSymbolStrip>
+    <!-- Mantém todo o código gerenciado (sem trim): o app usa reflexão (ViewLocator, ReactiveUI,
+         JsonSerializer). O AOT continua gerando nativo para a velocidade; só desativa a poda. -->
+    <MtouchLink>SdkOnly</MtouchLink>
   </PropertyGroup>
 
   <ItemGroup>
