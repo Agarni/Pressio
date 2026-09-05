@@ -21,6 +21,9 @@
     <!-- Mantém todo o código gerenciado (sem trim): o app usa reflexão (ViewLocator, ReactiveUI,
          JsonSerializer). O AOT continua gerando nativo para a velocidade; só desativa a poda. -->
     <MtouchLink>SdkOnly</MtouchLink>
+    <!-- Se ainda assim houver código reflexivo/dinâmico que não roda em AOT puro, o runtime
+         cai para o interpretador (evita o crash nativo na inicialização). -->
+    <MtouchExtraArgs>--interp</MtouchExtraArgs>
   </PropertyGroup>
 
   <ItemGroup>
