@@ -1018,9 +1018,9 @@ public class MainViewModel : ViewModelBase
         foreach (var (value, label) in MeasurementContextInfo.AllContexts)
         {
             var with = items.Where(x => (x.Context & value) != 0).ToList();
-            if (with.Count < 3) continue;
+            if (with.Count < 2) continue;
             var without = items.Where(x => (x.Context & value) == 0).ToList();
-            if (without.Count < 3) continue;
+            if (without.Count < 2) continue;
             var ws = (int)Math.Round(with.Average(x => x.Systolic), MidpointRounding.AwayFromZero);
             var wd = (int)Math.Round(with.Average(x => x.Diastolic), MidpointRounding.AwayFromZero);
             var ns = (int)Math.Round(without.Average(x => x.Systolic), MidpointRounding.AwayFromZero);
