@@ -234,6 +234,14 @@
         <StackPanel Spacing="14"><TextBlock Text="Confirmar exclusão" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource PressioTextBrush}" /><TextBlock Text="{Binding ConfirmMessage}" FontSize="13" Foreground="{DynamicResource PressioMutedBrush}" TextWrapping="Wrap" /><StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8"><Button Classes="secondary-button" Content="Cancelar" Command="{Binding CancelDeleteCommand}" /><Button Classes="danger-button" Content="Excluir" Command="{Binding ConfirmDeleteCommand}" /></StackPanel></StackPanel>
       </Border>
     </Grid>
+    <Grid Grid.RowSpan="2" IsVisible="{Binding IsSyncNotifierVisible}" IsHitTestVisible="False" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,64,0,0">
+      <Border Background="#D64545" CornerRadius="14" Padding="16,10" BoxShadow="0 6 24 0 #40171A2F" IsVisible="{Binding SyncNotifierIsError}">
+        <StackPanel Orientation="Horizontal" Spacing="8"><PathIcon Data="M13,14H11V9H13M13,18H11V16H13M1,21H23L12,2L1,21Z" Foreground="White" /><TextBlock Text="{Binding SyncNotifier}" FontSize="13" Foreground="White" /></StackPanel>
+      </Border>
+      <Border Background="{DynamicResource PressioBannerBrush}" CornerRadius="14" Padding="16,10" BoxShadow="0 6 24 0 #40171A2F" IsVisible="{Binding !SyncNotifierIsError}">
+        <StackPanel Orientation="Horizontal" Spacing="8"><PathIcon Data="M19.35,10.04C18.67,6.74 15.8,4 12,4C9.11,4 6.6,5.64 5.35,8.04C2.34,8.36 0,10.91 0,14C0,17.31 2.69,20 6,20H19C21.76,20 24,17.76 24,15C24,12.36 21.95,10.22 19.35,10.04Z" Foreground="{DynamicResource PressioBannerTextBrush}" /><TextBlock Text="{Binding SyncNotifier}" FontSize="13" Foreground="{DynamicResource PressioBannerTextBrush}" /></StackPanel>
+      </Border>
+    </Grid>
   </Grid>
   </Border>
 </UserControl>

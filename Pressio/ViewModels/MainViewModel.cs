@@ -57,6 +57,11 @@ public class MainViewModel : ViewModelBase
     public bool HasReadings => Measurements.Count > 0;
     public PressureCategory? LastReadingCategory => Measurements.FirstOrDefault()?.Category;
     public string LastReadingCategoryLabel => LastReadingCategory is { } c ? BloodPressureClassification.Label(c) : string.Empty;
+    // Aviso de sincronização na abertura: mostra progresso e só exibe erro (sem mensagem de sucesso).
+    public string SyncNotifier { get => _syncNotifier; private set => this.RaiseAndSetIfChanged(ref _syncNotifier, value); }
+    public bool SyncNotifierIsError { get => _syncNotifierIsError; private set => this.RaiseAndSetIfChanged(ref _syncNotifierIsError, value); }
+    public bool IsSyncNotifierVisible => !string.IsNullOrEmpty(SyncNotifier);
+    public bool SyncInProgress => IsSyncNotifierVisible && !SyncNotifierIsError;
 
     private bool _isMeasurementFormVisible;
     private readonly MeasurementRepository _measurementRepository = new();
@@ -95,6 +100,8 @@ public class MainViewModel : ViewModelBase
     private string _reminderNoticeMessage = string.Empty;
     private string _message = string.Empty;
     private bool _isMessageVisible;
+    private string _syncNotifier = string.Empty;
+    private bool _syncNotifierIsError;
     private readonly HashSet<(long Id, DateTime Date)> _firedReminders = new();
 
     public bool IsMeasurementFormVisible
@@ -394,24 +401,46 @@ public class MainViewModel : ViewModelBase
         _ = SyncCloudAsync(showResult: true);
     }
 
+    private void SetSyncBanner(string text, bool isError)
+    {
+        SyncNotifier = text;
+        SyncNotifierIsError = isError;
+        this.RaisePropertyChanged(nameof(IsSyncNotifierVisible));
+        this.RaisePropertyChanged(nameof(SyncInProgress));
+    }
+
     private async Task SyncCloudAsync(bool showResult)
     {
+        var startup = !showResult;
+        if (startup) SetSyncBanner("Sincronizando dados com a nuvem…", isError: false);
         try
         {
-            if (!_supabase.IsAuthenticated) { if (showResult) SetSyncError("Sessão inválida. Faça login novamente."); return; }
+            if (!_supabase.IsAuthenticated)
+            {
+                var msg = "Sessão inválida. Faça login novamente.";
+                if (showResult) SetSyncError(msg); else SetSyncBanner(msg, isError: true);
+                return;
+            }
             // Garante um access token válido (renova se o anterior expirou).
             var refreshed = await _supabase.RefreshAsync();
-            if (!refreshed.Success) { if (showResult) SetSyncError("Sessão expirada. Faça login novamente."); return; }
+            if (!refreshed.Success)
+            {
+                var msg = "Sessão expirada. Faça login novamente.";
+                if (showResult) SetSyncError(msg); else SetSyncBanner(msg, isError: true);
+                return;
+            }
             _settingsRepository.SaveAuthSession(_supabase.SerializeSession());
             var remote = await _supabase.FetchSnapshotAsync();
             var mergedJson = ApplyRemoteSync(remote, showMessage: showResult);
             await _supabase.SaveSnapshotAsync(mergedJson);
             _syncService.CompactTombstones();
+            if (startup) SetSyncBanner("", isError: false);
         }
         catch (Exception ex)
         {
             Settings.SyncStatus = "Falha ao sincronizar: " + ex.Message;
             if (showResult) ShowMessage(Settings.SyncStatus);
+            else SetSyncBanner(Settings.SyncStatus, isError: true);
         }
     }
 
