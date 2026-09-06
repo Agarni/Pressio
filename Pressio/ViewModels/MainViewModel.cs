@@ -328,6 +328,7 @@ public class MainViewModel : ViewModelBase
         Settings.SignUpRequested += () => _ = SignUpAsync();
         Settings.SignOutRequested += SignOut;
         Settings.SyncRequested += SyncNow;
+        Settings.ForgotPasswordRequested += () => _ = RequestPasswordReset();
         _syncService = new SyncService(_measurementRepository, _reminderRepository, _settingsRepository, _settingsRepository.GetOrCreateSyncDeviceId());
         ShowAboutCommand = ReactiveCommand.Create(() => { _isAboutSplash = false; this.RaisePropertyChanged(nameof(IsAboutCloseVisible)); IsAboutVisible = true; });
         CloseAboutCommand = ReactiveCommand.Create(() => { IsAboutVisible = false; });
@@ -511,6 +512,20 @@ public class MainViewModel : ViewModelBase
         _settingsRepository.SaveSupabase(Settings.SupabaseUrl, Settings.SupabaseAnonKey);
         _supabase.Configure(Settings.SupabaseUrl, Settings.SupabaseAnonKey);
         Notify("Dados da nuvem salvos.", "Sincronização");
+    }
+
+    private async Task RequestPasswordReset()
+    {
+        if (string.IsNullOrWhiteSpace(Settings.AuthEmail))
+        {
+            Notify("Informe seu e-mail para recuperar a senha.", "Recuperar senha");
+            return;
+        }
+        var result = await _supabase.ResetPasswordAsync(Settings.AuthEmail);
+        if (result.Success)
+            Notify("Enviamos um link de recuperação para seu e-mail. Siga as instruções para criar uma nova senha e depois entre com ela.", "Recuperar senha");
+        else
+            Notify(result.Error ?? "Não foi possível enviar o link de recuperação.", "Recuperar senha");
     }
 
     private async Task SignUpAsync()

@@ -146,6 +146,16 @@ public sealed class SupabaseClient
         return IsAuthenticated ? new(true, null) : new(false, "Não foi possível identificar o usuário a partir do link.");
     }
 
+    public async Task<AuthResult> ResetPasswordAsync(string email)
+    {
+        if (!IsConfigured) return new(false, "Configure a URL e a chave do Supabase em Configurações.");
+        using var request = NewRequest(HttpMethod.Post, "/auth/v1/recover", authed: false);
+        request.Content = new StringContent(JsonSerializer.Serialize(new { email }), Encoding.UTF8, "application/json");
+        using var response = await _http.SendAsync(request);
+        if (!response.IsSuccessStatusCode) return new(false, await ReadErrorAsync(response));
+        return new(true, null);
+    }
+
     private void SetSession(string access, string? refresh, string? userId)
     {
         AccessToken = access;
