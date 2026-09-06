@@ -109,6 +109,7 @@ public class MainViewModel : ViewModelBase
     private bool _splashMinElapsed;
     private bool _splashSyncFinished;
     private bool _syncInProgress;
+    private string _lastUploadedSnapshot = string.Empty;
     private readonly HashSet<(long Id, DateTime Date)> _firedReminders = new();
 
     public bool IsMeasurementFormVisible
@@ -330,6 +331,8 @@ public class MainViewModel : ViewModelBase
         Settings.SyncRequested += SyncNow;
         Settings.ForgotPasswordRequested += () => _ = RequestPasswordReset();
         _syncService = new SyncService(_measurementRepository, _reminderRepository, _settingsRepository, _settingsRepository.GetOrCreateSyncDeviceId());
+        // Basear do snapshot local: compara com o último enviado para detectar alterações não sincronizadas.
+        _lastUploadedSnapshot = _syncService.Serialize(_syncService.BuildLocalSnapshot());
         ShowAboutCommand = ReactiveCommand.Create(() => { _isAboutSplash = false; this.RaisePropertyChanged(nameof(IsAboutCloseVisible)); IsAboutVisible = true; });
         CloseAboutCommand = ReactiveCommand.Create(() => { IsAboutVisible = false; });
         CancelDeleteCommand = ReactiveCommand.Create(() => { IsConfirmDialogVisible = false; });
@@ -492,6 +495,7 @@ public class MainViewModel : ViewModelBase
             var remote = await _supabase.FetchSnapshotAsync();
             var mergedJson = ApplyRemoteSync(remote, showMessage: isManual);
             await _supabase.SaveSnapshotAsync(mergedJson);
+            _lastUploadedSnapshot = mergedJson;
             _syncService.CompactTombstones();
             if (isStartup) { FinishStartupSplash(); SetSyncBanner("", isError: false); }
         }
@@ -516,16 +520,21 @@ public class MainViewModel : ViewModelBase
 
     private async Task SignOut()
     {
-        var confirm = await Dialog.ConfirmAsync(
-            "Sair e limpar este aparelho",
-            "Ao sair, os dados deste aparelho serão apagados (o que está na nuvem é mantido). Deseja continuar?",
-            "Sim, sair",
-            "Cancelar");
+        // Verifica se há alterações locais que ainda não chegaram à nuvem (para avisar antes).
+        var localSnapshot = _syncService.Serialize(_syncService.BuildLocalSnapshot());
+        var hasUnsynced = !string.Equals(localSnapshot, _lastUploadedSnapshot, StringComparison.Ordinal);
+
+        var message = hasUnsynced
+            ? "Há alterações neste aparelho que ainda não foram sincronizadas com a nuvem. Ao sair, TODOS os dados do aparelho serão apagados e o que não está na nuvem se perderá. Deseja continuar?"
+            : "Ao sair, os dados deste aparelho serão apagados (o que está na nuvem é mantido). Deseja continuar?";
+        var confirm = await Dialog.ConfirmAsync("Sair e limpar este aparelho", message, "Sim, sair", "Cancelar");
         if (!confirm) return;
 
         // Cancela notificações dos lembretes antes de apagar.
         foreach (var reminder in _reminderRepository.GetAll())
             _ = Notifications.Service.CancelAsync(reminder.Id);
+        // Apaga SOMENTE no dispositivo (DELETE real no banco local — NÃO gera tombstones,
+        // então a nuvem não é afetada; ao entrar de novo o sync restaura).
         _measurementRepository.ClearAllData();
         _reminderRepository.ClearAllData();
         _settingsRepository.ClearAuthSession();
