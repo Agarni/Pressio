@@ -30,13 +30,15 @@ public partial class MeasurementFormView : UserControl
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
-        TopLevel.GetTopLevel(this)?.InputPane.StateChanged += OnInputPaneChanged;
+        var inputPane = TopLevel.GetTopLevel(this)?.InputPane;
+        if (inputPane is not null) inputPane.StateChanged += OnInputPaneChanged;
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
-        TopLevel.GetTopLevel(this)?.InputPane.StateChanged -= OnInputPaneChanged;
+        var inputPane = TopLevel.GetTopLevel(this)?.InputPane;
+        if (inputPane is not null) inputPane.StateChanged -= OnInputPaneChanged;
     }
 
     // Quando o teclado (input pane) abre, reduz a área do ScrollViewer e rola o campo focado

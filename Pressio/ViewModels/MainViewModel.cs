@@ -52,6 +52,7 @@ public class MainViewModel : ViewModelBase
     private Geometry _diastolicLine = new StreamGeometry();
     public Geometry DiastolicLine { get => _diastolicLine; private set => this.RaiseAndSetIfChanged(ref _diastolicLine, value); }
     public ObservableCollection<ChartPointLabel> ChartLabels { get; } = new();
+    public ObservableCollection<ChartPointMarker> ChartMarkers { get; } = new();
     public string BeforeMedicationSummary { get; private set; } = "—";
     public string AfterMedicationSummary { get; private set; } = "—";
     public IReadOnlyList<TimeSlotInfo> TimeDistribution { get; private set; } = Array.Empty<TimeSlotInfo>();
@@ -747,28 +748,7 @@ public class MainViewModel : ViewModelBase
     }
 
     private (List<BloodPressureMeasurement> Items, bool Truncated) BuildReportSet()
-    {
-        IEnumerable<BloodPressureMeasurement> query = Measurements;
-        switch (ReportPeriod)
-        {
-            case "Últimos 7 dias":
-                var from7 = DateTime.Today.AddDays(-6);
-                query = query.Where(m => m.MeasuredAt.Date >= from7);
-                break;
-            case "Últimos 30 dias":
-                var from30 = DateTime.Today.AddDays(-29);
-                query = query.Where(m => m.MeasuredAt.Date >= from30);
-                break;
-            case "Período personalizado":
-                if (ReportStartDate is { } start) query = query.Where(m => m.MeasuredAt.Date >= start.Date);
-                if (ReportEndDate is { } end) query = query.Where(m => m.MeasuredAt.Date <= end.Date);
-                break;
-        }
-        var list = query.OrderByDescending(m => m.MeasuredAt).ToList();
-        var truncated = list.Count > 30;
-        if (truncated) list = list.Take(30).ToList();
-        return (list.OrderBy(m => m.MeasuredAt).ToList(), truncated);
-    }
+        => DashboardCalculator.FilterByPeriod(Measurements, ReportPeriod, ReportStartDate, ReportEndDate);
 
     private string ReportDescription(IReadOnlyList<BloodPressureMeasurement> report)
     {
@@ -961,11 +941,11 @@ public class MainViewModel : ViewModelBase
     private void RefreshDashboard()
     {
         var ordered = Measurements.OrderBy(x => x.MeasuredAt).ToList();
-        BeforeMedicationSummary = SummarizeByMedication(ordered, MedicationTiming.BeforeMedication);
-        AfterMedicationSummary = SummarizeByMedication(ordered, MedicationTiming.AfterMedication);
-        TimeDistribution = BuildTimeDistribution(ordered);
-        ContextCounts = BuildContextCounts(ordered);
-        Correlations = BuildCorrelations(ordered);
+        BeforeMedicationSummary = DashboardCalculator.MedicationSummary(ordered, MedicationTiming.BeforeMedication);
+        AfterMedicationSummary = DashboardCalculator.MedicationSummary(ordered, MedicationTiming.AfterMedication);
+        TimeDistribution = DashboardCalculator.TimeDistribution(ordered);
+        ContextCounts = DashboardCalculator.ContextCounts(ordered);
+        Correlations = DashboardCalculator.Correlations(ordered);
         // O gráfico respeita o período selecionado (Hoje / 7 / 15 / 30 dias).
         var cutoff = ChartCutoff;
         var chartData = ordered.Where(m => m.MeasuredAt >= cutoff).ToList();
@@ -974,6 +954,7 @@ public class MainViewModel : ViewModelBase
             SystolicLine = new StreamGeometry();
             DiastolicLine = new StreamGeometry();
             ChartLabels.Clear();
+            ChartMarkers.Clear();
         }
         else
         {
@@ -986,8 +967,13 @@ public class MainViewModel : ViewModelBase
             SystolicLine = ChartPathBuilder.BuildSmooth(systolic);
             DiastolicLine = ChartPathBuilder.BuildSmooth(diastolic);
             ChartLabels.Clear();
+            ChartMarkers.Clear();
             for (var i = 0; i < chartData.Count; i++)
+            {
                 ChartLabels.Add(new ChartPointLabel(BloodPressureMeasurement.Format(chartData[i].Systolic, chartData[i].Diastolic), (int)Math.Clamp(X(i) - 26, 4, 442), (int)Math.Clamp(Y(chartData[i].Systolic) - 26, 4, 134)));
+                ChartMarkers.Add(new ChartPointMarker((int)X(i), (int)Y(chartData[i].Systolic), chartData[i].Category));
+                ChartMarkers.Add(new ChartPointMarker((int)X(i), (int)Y(chartData[i].Diastolic), chartData[i].Category));
+            }
         }
 
         this.RaisePropertyChanged(nameof(LastReading));
@@ -1006,44 +992,6 @@ public class MainViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(LastReadingCategoryLabel));
     }
 
-    private static string SummarizeByMedication(IReadOnlyList<BloodPressureMeasurement> items, MedicationTiming timing)
-    {
-        var subset = items.Where(x => x.MedicationTiming == timing).ToList();
-        if (subset.Count == 0) return "—";
-        var systolic = (int)Math.Round(subset.Average(x => x.Systolic), MidpointRounding.AwayFromZero);
-        var diastolic = (int)Math.Round(subset.Average(x => x.Diastolic), MidpointRounding.AwayFromZero);
-        return $"{subset.Count}x  ·  média {BloodPressureMeasurement.Format(systolic, diastolic)}";
-    }
-
-    private static IReadOnlyList<TimeSlotInfo> BuildTimeDistribution(IReadOnlyList<BloodPressureMeasurement> items) => new[]
-    {
-        BuildSlot("Madrugada", items.Where(x => x.MeasuredAt.Hour < 6)),
-        BuildSlot("Manhã", items.Where(x => x.MeasuredAt.Hour >= 6 && x.MeasuredAt.Hour < 12)),
-        BuildSlot("Tarde", items.Where(x => x.MeasuredAt.Hour >= 12 && x.MeasuredAt.Hour < 18)),
-        BuildSlot("Noite", items.Where(x => x.MeasuredAt.Hour >= 18)),
-    };
-
-    private static TimeSlotInfo BuildSlot(string label, IEnumerable<BloodPressureMeasurement> subset)
-    {
-        var list = subset.ToList();
-        if (list.Count == 0) return new TimeSlotInfo(label, 0, "—");
-        var systolic = (int)Math.Round(list.Average(x => x.Systolic), MidpointRounding.AwayFromZero);
-        var diastolic = (int)Math.Round(list.Average(x => x.Diastolic), MidpointRounding.AwayFromZero);
-        return new TimeSlotInfo(label, list.Count, BloodPressureMeasurement.Format(systolic, diastolic));
-    }
-
-    private static IReadOnlyList<ContextCountInfo> BuildContextCounts(IReadOnlyList<BloodPressureMeasurement> items)
-    {
-        var result = new List<ContextCountInfo>();
-        foreach (var (value, label) in MeasurementContextInfo.AllContexts)
-        {
-            var count = items.Count(x => (x.Context & value) != 0);
-            if (count > 0) result.Add(new ContextCountInfo(label, count));
-        }
-        return result;
-    }
-
-    // Correlações simples (sem IA): diferença da média com/sem cada fator de contexto.
     private DateTime ChartCutoff => ChartPeriod switch
     {
         "Hoje" => DateTime.Today,
@@ -1051,31 +999,6 @@ public class MainViewModel : ViewModelBase
         "Últimos 15 dias" => DateTime.Today.AddDays(-14),
         _ => DateTime.Today.AddDays(-29)
     };
-
-    private static IReadOnlyList<CorrelationInfo> BuildCorrelations(IReadOnlyList<BloodPressureMeasurement> items)
-    {
-        var result = new List<CorrelationInfo>();
-        foreach (var (value, label) in MeasurementContextInfo.AllContexts)
-        {
-            var with = items.Where(x => (x.Context & value) != 0).ToList();
-            if (with.Count < 2) continue;
-            var without = items.Where(x => (x.Context & value) == 0).ToList();
-            if (without.Count < 2) continue;
-            var ws = (int)Math.Round(with.Average(x => x.Systolic), MidpointRounding.AwayFromZero);
-            var wd = (int)Math.Round(with.Average(x => x.Diastolic), MidpointRounding.AwayFromZero);
-            var ns = (int)Math.Round(without.Average(x => x.Systolic), MidpointRounding.AwayFromZero);
-            var nd = (int)Math.Round(without.Average(x => x.Diastolic), MidpointRounding.AwayFromZero);
-            var ds = ws - ns;
-            var dd = wd - nd;
-            if (ds == 0 && dd == 0) continue;
-            var delta = $"{(ds >= 0 ? "+" : "")}{ds}/{(dd >= 0 ? "+" : "")}{dd}";
-            var detail = $"com: {with.Count}x {BloodPressureMeasurement.Format(ws, wd)}  ·  sem: {without.Count}x {BloodPressureMeasurement.Format(ns, nd)}";
-            result.Add(new CorrelationInfo(label, delta, detail, ds > 0 || dd > 0, ds, dd));
-        }
-        return result
-            .OrderByDescending(c => Math.Max(Math.Abs(c.DeltaSys), Math.Abs(c.DeltaDia)))
-            .ToList();
-    }
 
     private void ReloadReminders()
     {

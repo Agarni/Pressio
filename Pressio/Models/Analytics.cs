@@ -14,4 +14,10 @@ public sealed record ChartPointLabel(string Text, int X, int Y)
     public Thickness Offset => new(X, Y, 0, 0);
 }
 
+// Ponto do gráfico colorido pela classificação (faixa) da leitura.
+public sealed record ChartPointMarker(int X, int Y, PressureCategory Category)
+{
+    public Thickness Offset => new(X - 4, Y - 4, 0, 0);
+}
+
 public sealed record ExportFileRequest(string FileName, string Extension, string Kind, string? StartDirectory);
