@@ -64,7 +64,15 @@ public sealed class ReminderRepository
         using var command = connection.CreateCommand();
         command.CommandText = "UPDATE Reminders SET Deleted=1, UpdatedAtUtc=$updatedAt WHERE Id=$id";
         command.Parameters.AddWithValue("$id", id);
-        command.Parameters.AddWithValue("$updatedAt", DateTime.UtcNow.ToString("O"));
+        command.Parameters.AddWithValue("$updatedAt", DateTime.UtcNow.ToString("O"));        command.ExecuteNonQuery();
+    }
+
+    // Apaga TODOS os lembretes (privacy ao sair) — DELETE real, não tombstone.
+    public void ClearAllData()
+    {
+        using var connection = Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM Reminders;";
         command.ExecuteNonQuery();
     }
 

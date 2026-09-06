@@ -47,8 +47,16 @@ public sealed class MeasurementRepository
     public void DeletePatient(long id)
     {
         using var connection = Open(); using var command = connection.CreateCommand();
-        command.CommandText = "UPDATE BloodPressureMeasurements SET Deleted=1, UpdatedAtUtc=$updatedAt WHERE PatientId=$id; UPDATE Patients SET Deleted=1, UpdatedAtUtc=$updatedAt WHERE Id=$id";
-        command.Parameters.AddWithValue("$updatedAt", DateTime.UtcNow.ToString("O")); command.ExecuteNonQuery();
+        command.CommandText = "UPDATE BloodPressureMeasurements SET Deleted=1, UpdatedAtUtc=$updatedAt WHERE PatientId=$id; UPDATE Patients SET Deleted=1, UpdatedAtUtc=$updatedAt WHERE Id=$id";        command.Parameters.AddWithValue("$updatedAt", DateTime.UtcNow.ToString("O")); command.ExecuteNonQuery();
+    }
+
+    // Apaga TODOS os dados (usuários e medições) — usado ao sair da conta (privacy).
+    // É um DELETE real (soft-delete viraria tombstones sincronizados e apagaria a nuvem também).
+    public void ClearAllData()
+    {
+        using var connection = Open(); using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM BloodPressureMeasurements; DELETE FROM Patients;";
+        command.ExecuteNonQuery();
     }
 
     public long Add(BloodPressureMeasurement measurement, long patientId)

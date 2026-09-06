@@ -326,7 +326,7 @@ public class MainViewModel : ViewModelBase
         Settings.SaveSupabaseRequested += SaveSupabaseConfig;
         Settings.SignInRequested += () => _ = SignInAsync();
         Settings.SignUpRequested += () => _ = SignUpAsync();
-        Settings.SignOutRequested += SignOut;
+        Settings.SignOutRequested += () => _ = SignOut();
         Settings.SyncRequested += SyncNow;
         Settings.ForgotPasswordRequested += () => _ = RequestPasswordReset();
         _syncService = new SyncService(_measurementRepository, _reminderRepository, _settingsRepository, _settingsRepository.GetOrCreateSyncDeviceId());
@@ -514,6 +514,37 @@ public class MainViewModel : ViewModelBase
         Notify("Dados da nuvem salvos.", "Sincronização");
     }
 
+    private async Task SignOut()
+    {
+        var confirm = await Dialog.ConfirmAsync(
+            "Sair e limpar este aparelho",
+            "Ao sair, os dados deste aparelho serão apagados (o que está na nuvem é mantido). Deseja continuar?",
+            "Sim, sair",
+            "Cancelar");
+        if (!confirm) return;
+
+        // Cancela notificações dos lembretes antes de apagar.
+        foreach (var reminder in _reminderRepository.GetAll())
+            _ = Notifications.Service.CancelAsync(reminder.Id);
+        _measurementRepository.ClearAllData();
+        _reminderRepository.ClearAllData();
+        _settingsRepository.ClearAuthSession();
+        _supabase.ClearSession();
+
+        Settings.IsAuthenticated = false;
+        Settings.AuthUserEmail = string.Empty;
+        ReloadPatients();
+        ReloadMeasurements();
+        ReloadReminders();
+        ReloadProfileList();
+        Notify("Sessão encerrada e dados deste aparelho removidos.", "Sair");
+    }
+
+    private void ReloadProfileList()
+    {
+        ProfileList.Profiles.Clear();
+    }
+
     private async Task RequestPasswordReset()
     {
         if (string.IsNullOrWhiteSpace(Settings.AuthEmail))
@@ -552,14 +583,7 @@ public class MainViewModel : ViewModelBase
         _settingsRepository.SaveRememberedEmail(Settings.AuthEmail);
     }
 
-    private void SignOut()
-    {
-        _supabase.ClearSession();
-        _settingsRepository.ClearAuthSession();
-        Settings.IsAuthenticated = false;
-        Settings.AuthUserEmail = string.Empty;
-        Notify("Sessão encerrada.", "Sincronização");
-    }
+
 
     public string BuildLocalSyncJson() => _syncService.Serialize(_syncService.BuildLocalSnapshot());
 
