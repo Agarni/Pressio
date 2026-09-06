@@ -210,6 +210,18 @@ public class MainViewModel : ViewModelBase
     public bool IsCustomReportPeriod => ReportPeriod == "Período personalizado";
     public DateTime? ReportStartDate { get => _reportStartDate; set => this.RaiseAndSetIfChanged(ref _reportStartDate, value); }
     public DateTime? ReportEndDate { get => _reportEndDate; set => this.RaiseAndSetIfChanged(ref _reportEndDate, value); }
+
+    public IReadOnlyList<string> ChartPeriodOptions { get; } = new[] { "Hoje", "Últimos 7 dias", "Últimos 15 dias", "Últimos 30 dias" };
+    private string _chartPeriod = "Últimos 30 dias";
+    public string ChartPeriod
+    {
+        get => _chartPeriod;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _chartPeriod, value);
+            if (value is not null) RefreshDashboard();
+        }
+    }
     public ObservableCollection<ReminderItem> Reminders { get; } = new();
     public ReminderItem? SelectedReminder { get => _selectedReminder; set => this.RaiseAndSetIfChanged(ref _selectedReminder, value); }
     public bool IsRemindersVisible { get => _isRemindersVisible; private set { this.RaiseAndSetIfChanged(ref _isRemindersVisible, value); this.RaisePropertyChanged(nameof(IsRemindersDialogVisible)); this.RaisePropertyChanged(nameof(IsRemindersMobilePageVisible)); } }
@@ -260,6 +272,7 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> DeleteReminderCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> DismissReminderNoticeCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ClearFiltersCommand { get; private set; } = null!;
+    public ReactiveCommand<string, Unit> SetChartPeriodCommand { get; private set; } = null!;
 
     private void Initialize()
     {
@@ -326,6 +339,7 @@ public class MainViewModel : ViewModelBase
             FilterTimeOfDay = "Todos os horários";
             FilterSearch = string.Empty;
         });
+        SetChartPeriodCommand = ReactiveCommand.Create<string>(p => ChartPeriod = p);
         ShowRemindersCommand = ReactiveCommand.Create(() => { IsRemindersVisible = true; ReloadReminders(); });
         CloseRemindersCommand = ReactiveCommand.Create(() => { IsRemindersVisible = false; IsReminderFormVisible = false; });
         ShowReminderFormCommand = ReactiveCommand.Create(() =>
@@ -952,7 +966,10 @@ public class MainViewModel : ViewModelBase
         TimeDistribution = BuildTimeDistribution(ordered);
         ContextCounts = BuildContextCounts(ordered);
         Correlations = BuildCorrelations(ordered);
-        if (ordered.Count == 0)
+        // O gráfico respeita o período selecionado (Hoje / 7 / 15 / 30 dias).
+        var cutoff = ChartCutoff;
+        var chartData = ordered.Where(m => m.MeasuredAt >= cutoff).ToList();
+        if (chartData.Count == 0)
         {
             SystolicLine = new StreamGeometry();
             DiastolicLine = new StreamGeometry();
@@ -960,17 +977,17 @@ public class MainViewModel : ViewModelBase
         }
         else
         {
-            var min = ordered.Min(x => Math.Min(x.Systolic, x.Diastolic));
-            var max = Math.Max(min + 1, ordered.Max(x => Math.Max(x.Systolic, x.Diastolic)));
-            double X(int i) => ordered.Count == 1 ? 250 : i * 500d / (ordered.Count - 1);
+            var min = chartData.Min(x => Math.Min(x.Systolic, x.Diastolic));
+            var max = Math.Max(min + 1, chartData.Max(x => Math.Max(x.Systolic, x.Diastolic)));
+            double X(int i) => chartData.Count == 1 ? 250 : i * 500d / (chartData.Count - 1);
             double Y(int v) => 138 - ((v - min) * 108d / (max - min));
-            var systolic = ordered.Select((x, i) => new Point(X(i), Y(x.Systolic))).ToList();
-            var diastolic = ordered.Select((x, i) => new Point(X(i), Y(x.Diastolic))).ToList();
+            var systolic = chartData.Select((x, i) => new Point(X(i), Y(x.Systolic))).ToList();
+            var diastolic = chartData.Select((x, i) => new Point(X(i), Y(x.Diastolic))).ToList();
             SystolicLine = ChartPathBuilder.BuildSmooth(systolic);
             DiastolicLine = ChartPathBuilder.BuildSmooth(diastolic);
             ChartLabels.Clear();
-            for (var i = 0; i < ordered.Count; i++)
-                ChartLabels.Add(new ChartPointLabel(BloodPressureMeasurement.Format(ordered[i].Systolic, ordered[i].Diastolic), (int)Math.Clamp(X(i) - 26, 4, 442), (int)Math.Clamp(Y(ordered[i].Systolic) - 26, 4, 134)));
+            for (var i = 0; i < chartData.Count; i++)
+                ChartLabels.Add(new ChartPointLabel(BloodPressureMeasurement.Format(chartData[i].Systolic, chartData[i].Diastolic), (int)Math.Clamp(X(i) - 26, 4, 442), (int)Math.Clamp(Y(chartData[i].Systolic) - 26, 4, 134)));
         }
 
         this.RaisePropertyChanged(nameof(LastReading));
@@ -1027,6 +1044,14 @@ public class MainViewModel : ViewModelBase
     }
 
     // Correlações simples (sem IA): diferença da média com/sem cada fator de contexto.
+    private DateTime ChartCutoff => ChartPeriod switch
+    {
+        "Hoje" => DateTime.Today,
+        "Últimos 7 dias" => DateTime.Today.AddDays(-6),
+        "Últimos 15 dias" => DateTime.Today.AddDays(-14),
+        _ => DateTime.Today.AddDays(-29)
+    };
+
     private static IReadOnlyList<CorrelationInfo> BuildCorrelations(IReadOnlyList<BloodPressureMeasurement> items)
     {
         var result = new List<CorrelationInfo>();
