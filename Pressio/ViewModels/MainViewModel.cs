@@ -590,6 +590,8 @@ public class MainViewModel : ViewModelBase
         Notify("Conectado: " + Settings.AuthUserEmail, "Sincronização");
         _settingsRepository.SaveAuthSession(_supabase.SerializeSession());
         _settingsRepository.SaveRememberedEmail(Settings.AuthEmail);
+        // Busca os dados da nuvem logo após entrar (restaura usuários/medições/lembretes).
+        _ = SyncCloudAsync(SyncMode.Periodic);
     }
 
 
