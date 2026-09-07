@@ -36,10 +36,13 @@ public static class PdfReportService
 
     private static int CountPages(Patient patient, IReadOnlyList<BloodPressureMeasurement> measurements, string description, bool truncated, bool letter)
     {
-        using var doc = SKDocument.CreatePdf(new MemoryStream());
-        return letter
+        using var ms = new MemoryStream();
+        using var doc = SKDocument.CreatePdf(ms);
+        var pages = letter
             ? RenderLetter(doc, patient, measurements, description, totalPages: -1)
             : RenderReport(doc, patient, measurements, description, truncated, totalPages: -1);
+        doc.Close();
+        return pages;
     }
 
     private static int RenderReport(SKDocument document, Patient patient, IReadOnlyList<BloodPressureMeasurement> measurements, string description, bool truncated, int totalPages)

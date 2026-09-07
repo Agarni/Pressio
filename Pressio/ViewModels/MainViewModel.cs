@@ -807,9 +807,11 @@ public class MainViewModel : ViewModelBase
     {
         if (SelectedPatient is null || Measurements.Count == 0) { Notify("Não há medições para exportar."); return; }
         var (report, truncated) = BuildReportSet();
+        if (report.Count == 0) { Notify("Não há medições no período selecionado."); return; }
         var path = await RequestExportPath("pdf", "PDF");
         if (path is null) { Notify("Exportação cancelada."); return; }
-        PdfReportService.Export(path, SelectedPatient, report, ReportDescription(report), truncated);
+        try { PdfReportService.Export(path, SelectedPatient, report, ReportDescription(report), truncated); }
+        catch (Exception ex) { Notify("Falha ao gerar o PDF: " + ex.Message, "Exportar PDF"); return; }
         SaveExportDirectory(path);
         await ConfirmOpenExport(path);
     }
@@ -818,9 +820,11 @@ public class MainViewModel : ViewModelBase
     {
         if (SelectedPatient is null || Measurements.Count == 0) { Notify("Não há medições para exportar."); return; }
         var (report, truncated) = BuildReportSet();
+        if (report.Count == 0) { Notify("Não há medições no período selecionado."); return; }
         var path = await RequestExportPath("pdf", "PDF da carta");
         if (path is null) { Notify("Exportação cancelada."); return; }
-        PdfReportService.ExportDoctorLetter(path, SelectedPatient, report, ReportDescription(report));
+        try { PdfReportService.ExportDoctorLetter(path, SelectedPatient, report, ReportDescription(report)); }
+        catch (Exception ex) { Notify("Falha ao gerar a carta: " + ex.Message, "Carta ao médico"); return; }
         SaveExportDirectory(path);
         await ConfirmOpenExport(path);
     }
@@ -1155,6 +1159,7 @@ public class MainViewModel : ViewModelBase
         if (IsRemindersVisible) { IsRemindersVisible = false; return true; }
         if (IsAboutVisible) { IsAboutVisible = false; return true; }
         if (IsSettingsVisible) { IsSettingsVisible = false; return true; }
+        if (IsProfileListVisible) { IsProfileListVisible = false; return true; }
         if (IsPatientFormVisible) { IsPatientFormVisible = false; return true; }
         if (IsMeasurementFormVisible) { IsMeasurementFormVisible = false; return true; }
         return false;
