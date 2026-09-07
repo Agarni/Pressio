@@ -1,12 +1,16 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Reactive;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Pressio.Services;
 using Pressio.ViewModels;
 
@@ -15,8 +19,15 @@ namespace Pressio.Views;
 public partial class MainView : UserControl
 {
     private bool _interactionsRegistered;
+    private bool _isMobile;
     private IStorageFolder? _syncFolder;
     private IStorageFile? _lastExportFile;
+
+    // Gestos (mobile): swipe da borda esquerda = voltar; toque na barra de status = rolar ao topo.
+    private Point _gestureStart;
+    private DateTime? _gestureDownAt;
+    private bool _swipeArmed;
+    private bool _tapTopArmed;
 
     public MainView()
     {
@@ -43,6 +54,12 @@ public partial class MainView : UserControl
     {
         if (_interactionsRegistered || DataContext is not MainViewModel vm) return;
         _interactionsRegistered = true;
+        _isMobile = vm.IsMobileLayout;
+        if (_isMobile)
+        {
+            AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Bubble, handledEventsToo: true);
+            AddHandler(PointerReleasedEvent, OnPointerReleased, RoutingStrategies.Bubble, handledEventsToo: true);
+        }
 
         vm.ExportFileInteraction.RegisterHandler(async ctx =>
         {
@@ -168,5 +185,48 @@ public partial class MainView : UserControl
             }
             ctx.SetOutput(Unit.Default);
         });
+    }
+
+    private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!_isMobile) return;
+        var pos = e.GetPosition(this);
+        _gestureStart = pos;
+        _gestureDownAt = DateTime.UtcNow;
+        // Swipe de voltar: começa perto da borda esquerda.
+        _swipeArmed = pos.X <= Math.Max(24, Bounds.Width * 0.12);
+        // Toque para rolar ao topo: na faixa da barra de status / topo.
+        var topStrip = Root.Padding.Top > 0 ? Root.Padding.Top : 24;
+        _tapTopArmed = pos.Y <= topStrip;
+    }
+
+    private void OnPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (!_isMobile) return;
+        var pos = e.GetPosition(this);
+        var dx = pos.X - _gestureStart.X;
+        var dy = Math.Abs(pos.Y - _gestureStart.Y);
+        var elapsed = DateTime.UtcNow - (_gestureDownAt ?? DateTime.UtcNow);
+
+        // Swipe da esquerda para a direita -> voltar.
+        if (_swipeArmed && dx > 70 && dy < dx * 0.6 && DataContext is MainViewModel vm)
+        {
+            if (vm.HandleBack()) e.Handled = true;
+        }
+        // Toque curto e sem mover na faixa do topo -> rolar ao topo.
+        else if (_tapTopArmed && elapsed < TimeSpan.FromMilliseconds(400) && Math.Abs(dx) < 12 && dy < 12)
+        {
+            ScrollToTop();
+            e.Handled = true;
+        }
+
+        _swipeArmed = false;
+        _tapTopArmed = false;
+    }
+
+    private void ScrollToTop()
+    {
+        foreach (var scroll in this.GetVisualDescendants().OfType<ScrollViewer>())
+            scroll.Offset = default;
     }
 }
