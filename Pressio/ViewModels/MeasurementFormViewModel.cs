@@ -67,10 +67,11 @@ public sealed class MeasurementFormViewModel : ViewModelBase
                 BloodPressureInput = result.Value;
                 MeasurementError = string.Empty;
             }
-            else if (!string.IsNullOrWhiteSpace(result.RawText))
+            else if (!string.IsNullOrWhiteSpace(result.RawText) || !string.IsNullOrWhiteSpace(result.Diagnostics))
             {
-                var raw = result.RawText.Replace('\n', ' ').Replace('\r', ' ');
-                MeasurementError = $"Não consegui identificar a pressão. O reconhecimento retornou: \"{raw}\"";
+                var raw = (result.RawText ?? "").Replace('\n', ' ').Replace('\r', ' ');
+                var diag = (result.Diagnostics ?? "").Replace('\n', ' ').Replace('\r', ' ');
+                MeasurementError = ($"Não consegui identificar a pressão.{raw} {diag}").Trim();
             }
             else
             {

@@ -4,9 +4,9 @@ using System.Threading.Tasks;
 
 namespace Pressio.Services;
 
-public sealed record CaptureReadingResult(string? Value, string? RawText)
+public sealed record CaptureReadingResult(string? Value, string? RawText, string? Diagnostics = null)
 {
-    public static readonly CaptureReadingResult None = new(null, null);
+    public static readonly CaptureReadingResult None = new(null, null, null);
 }
 
 public interface IMeasurementCaptureService
