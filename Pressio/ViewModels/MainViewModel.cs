@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Platform.Storage;
 using Pressio.Models;
 using Pressio.Services;
 using ReactiveUI;
@@ -261,7 +262,7 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> ExportLetterCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> BackupCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> RestoreCommand { get; private set; } = null!;
-    public Interaction<ExportFileRequest, string?> ExportFileInteraction { get; } = new();
+    public Interaction<ExportFileRequest, IStorageFile?> ExportFileInteraction { get; } = new();
     public Interaction<string, bool> OpenExportInteraction { get; } = new();
     public Interaction<Unit, string?> OpenFileInteraction { get; } = new();
     public Interaction<Unit, string?> FolderPickerInteraction { get; } = new();
@@ -744,8 +745,9 @@ public class MainViewModel : ViewModelBase
 
     private async Task Backup()
     {
-        var path = await ExportFileInteraction.Handle(new ExportFileRequest($"pressio-backup-{DateTime.Now:yyyyMMdd-HHmmss}.db", ".db", "Backup", _settingsRepository.GetLastExportDirectory())).FirstAsync();
-        if (string.IsNullOrWhiteSpace(path)) { Notify("Backup cancelado."); return; }
+        var file = await ExportFileInteraction.Handle(new ExportFileRequest($"pressio-backup-{DateTime.Now:yyyyMMdd-HHmmss}.db", ".db", "Backup", _settingsRepository.GetLastExportDirectory())).FirstAsync();
+        if (file is null) { Notify("Backup cancelado."); return; }
+        var path = TryLocalPath(file);
         try
         {
             if (File.Exists(path)) File.Delete(path);
@@ -794,13 +796,21 @@ public class MainViewModel : ViewModelBase
     private async Task ExportCsv()
     {        if (SelectedPatient is null || Measurements.Count == 0) { Notify("Não há medições para exportar."); return; }
         var (report, truncated) = BuildReportSet();
-        var path = await RequestExportPath("csv", "CSV");
-        if (path is null) { Notify("Exportação cancelada."); return; }
-        var rows = new[] { "Pressão;Data e hora;Medicação;Classificação;Contexto;Observação" }.Concat(report.Select(m =>
-            $"{m.DisplayValue};{m.DisplayDate};{DescribeMedicationTiming(m.MedicationTiming)};{m.CategoryLabel};{(m.HasContext ? m.DisplayContext : "—")};{m.Notes?.Replace(';', ',') ?? string.Empty}"));
-        File.WriteAllLines(path, rows);
-        SaveExportDirectory(path);
-        await ConfirmOpenExport(path);
+        if (report.Count == 0) { Notify("Não há medições no período selecionado."); return; }
+        var file = await RequestExportPath("csv", "CSV");
+        if (file is null) { Notify("Exportação cancelada."); return; }
+        try
+        {
+            var rows = new[] { "Pressão;Data e hora;Medicação;Classificação;Contexto;Observação" }.Concat(report.Select(m =>
+                $"{m.DisplayValue};{m.DisplayDate};{DescribeMedicationTiming(m.MedicationTiming)};{m.CategoryLabel};{(m.HasContext ? m.DisplayContext : "—")};{m.Notes?.Replace(';', ',') ?? string.Empty}"));
+            var bytes = System.Text.Encoding.UTF8.GetBytes(string.Join(Environment.NewLine, rows) + Environment.NewLine);
+            await using var s = await file.OpenWriteAsync();
+            s.SetLength(0);
+            await s.WriteAsync(bytes);
+        }
+        catch (Exception ex) { Notify("Falha ao salvar o CSV: " + ex.Message, "Exportar CSV"); return; }
+        SaveExportDirectory(file);
+        await ConfirmOpenExport(file);
     }
 
     private async Task ExportPdf()
@@ -808,12 +818,17 @@ public class MainViewModel : ViewModelBase
         if (SelectedPatient is null || Measurements.Count == 0) { Notify("Não há medições para exportar."); return; }
         var (report, truncated) = BuildReportSet();
         if (report.Count == 0) { Notify("Não há medições no período selecionado."); return; }
-        var path = await RequestExportPath("pdf", "PDF");
-        if (path is null) { Notify("Exportação cancelada."); return; }
-        try { PdfReportService.Export(path, SelectedPatient, report, ReportDescription(report), truncated); }
+        var file = await RequestExportPath("pdf", "PDF");
+        if (file is null) { Notify("Exportação cancelada."); return; }
+        try
+        {
+            await using var s = await file.OpenWriteAsync();
+            s.SetLength(0);
+            PdfReportService.Export(s, SelectedPatient, report, ReportDescription(report), truncated);
+        }
         catch (Exception ex) { Notify("Falha ao gerar o PDF: " + ex.Message, "Exportar PDF"); return; }
-        SaveExportDirectory(path);
-        await ConfirmOpenExport(path);
+        SaveExportDirectory(file);
+        await ConfirmOpenExport(file);
     }
 
     private async Task ExportLetter()
@@ -821,19 +836,25 @@ public class MainViewModel : ViewModelBase
         if (SelectedPatient is null || Measurements.Count == 0) { Notify("Não há medições para exportar."); return; }
         var (report, truncated) = BuildReportSet();
         if (report.Count == 0) { Notify("Não há medições no período selecionado."); return; }
-        var path = await RequestExportPath("pdf", "PDF da carta");
-        if (path is null) { Notify("Exportação cancelada."); return; }
-        try { PdfReportService.ExportDoctorLetter(path, SelectedPatient, report, ReportDescription(report)); }
+        var file = await RequestExportPath("pdf", "PDF da carta");
+        if (file is null) { Notify("Exportação cancelada."); return; }
+        try
+        {
+            await using var s = await file.OpenWriteAsync();
+            s.SetLength(0);
+            PdfReportService.ExportDoctorLetter(s, SelectedPatient, report, ReportDescription(report));
+        }
         catch (Exception ex) { Notify("Falha ao gerar a carta: " + ex.Message, "Carta ao médico"); return; }
-        SaveExportDirectory(path);
-        await ConfirmOpenExport(path);
+        SaveExportDirectory(file);
+        await ConfirmOpenExport(file);
     }
 
     // Pergunta se o usuário quer abrir o arquivo gerado com o aplicativo padrão do sistema
     // (funciona no desktop e no mobile; abre via Launcher).
-    private async Task ConfirmOpenExport(string path)
+    private async Task ConfirmOpenExport(IStorageFile file)
     {
         if (!await Dialog.ConfirmAsync("Abrir arquivo", "O arquivo foi gerado. Deseja abri-lo com o aplicativo padrão?", "Abrir", "Mais tarde")) return;
+        var path = TryLocalPath(file);
         var ok = await OpenExportInteraction.Handle(path).FirstAsync();
         if (!ok) Notify("Não foi possível abrir o arquivo automaticamente.", "Abrir arquivo");
     }
@@ -853,17 +874,21 @@ public class MainViewModel : ViewModelBase
         return $"Período do relatório: {range}";
     }
 
-    private async Task<string?> RequestExportPath(string extension, string kind)
+    private async Task<IStorageFile?> RequestExportPath(string extension, string kind)
     {
         var request = new ExportFileRequest($"pressio-{SelectedPatient!.Name.Replace(' ', '-')}-{DateTime.Now:yyyyMMdd-HHmmss}.{extension}", $".{extension}", kind, _settingsRepository.GetLastExportDirectory());
         return await ExportFileInteraction.Handle(request).FirstAsync();
     }
 
-    private void SaveExportDirectory(string path)
+    private void SaveExportDirectory(IStorageFile file)
     {
+        var path = TryLocalPath(file);
         var directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrWhiteSpace(directory)) _settingsRepository.SaveLastExportDirectory(directory);
     }
+
+    private static string TryLocalPath(IStorageFile file)
+        => file.TryGetLocalPath() ?? file.Path.LocalPath;
 
     private void ClosePatientForm()
     {

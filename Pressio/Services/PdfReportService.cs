@@ -17,8 +17,13 @@ public static class PdfReportService
 
     public static void Export(string path, Patient patient, IReadOnlyList<BloodPressureMeasurement> measurements, string description, bool truncated)
     {
-        var total = CountPages(patient, measurements, description, truncated, letter: false);
         using var stream = File.Create(path);
+        Export(stream, patient, measurements, description, truncated);
+    }
+
+    public static void Export(Stream stream, Patient patient, IReadOnlyList<BloodPressureMeasurement> measurements, string description, bool truncated)
+    {
+        var total = CountPages(patient, measurements, description, truncated, letter: false);
         using var document = SKDocument.CreatePdf(stream);
         RenderReport(document, patient, measurements, description, truncated, total);
         document.Close();
@@ -27,8 +32,13 @@ public static class PdfReportService
     // Carta concisa para o médico: resumo clínico + faixas de referência + leituras relevantes.
     public static void ExportDoctorLetter(string path, Patient patient, IReadOnlyList<BloodPressureMeasurement> measurements, string description)
     {
-        var total = CountPages(patient, measurements, description, truncated: false, letter: true);
         using var stream = File.Create(path);
+        ExportDoctorLetter(stream, patient, measurements, description);
+    }
+
+    public static void ExportDoctorLetter(Stream stream, Patient patient, IReadOnlyList<BloodPressureMeasurement> measurements, string description)
+    {
+        var total = CountPages(patient, measurements, description, truncated: false, letter: true);
         using var document = SKDocument.CreatePdf(stream);
         RenderLetter(document, patient, measurements, description, total);
         document.Close();

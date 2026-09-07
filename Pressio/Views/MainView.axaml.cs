@@ -81,7 +81,7 @@ public partial class MainView : UserControl
                 }
             });
             _lastExportFile = file;
-            ctx.SetOutput(file?.TryGetLocalPath());
+            ctx.SetOutput(file);
         });
 
         vm.OpenExportInteraction.RegisterHandler(async ctx =>
