@@ -53,6 +53,10 @@
 	<array>
 		<string>armv7</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Usamos a câmera para ler os números do seu monitor de pressão.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Permita o acesso às fotos para ler uma imagem do monitor de pressão.</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

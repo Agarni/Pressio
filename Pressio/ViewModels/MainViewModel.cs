@@ -111,6 +111,10 @@ public class MainViewModel : ViewModelBase
     private bool _syncInProgress;
     private string _lastUploadedSnapshot = string.Empty;
     private readonly HashSet<(long Id, DateTime Date)> _firedReminders = new();
+    private string _appVersion = string.Empty;
+    private string _databaseSizeText = "—";
+    private string _databasePathText = string.Empty;
+    private string _lastSyncText = "Nunca";
 
     public bool IsMeasurementFormVisible
     {
@@ -178,6 +182,10 @@ public class MainViewModel : ViewModelBase
     public bool IsAboutDialogVisible => IsAboutVisible && !IsMobileLayout;
     public bool IsAboutMobilePageVisible => IsAboutVisible && IsMobileLayout;
     public bool IsAboutCloseVisible => !_isAboutSplash;
+    public string AppVersion { get => _appVersion; private set => this.RaiseAndSetIfChanged(ref _appVersion, value); }
+    public string DatabaseSizeText { get => _databaseSizeText; private set => this.RaiseAndSetIfChanged(ref _databaseSizeText, value); }
+    public string DatabasePathText { get => _databasePathText; private set => this.RaiseAndSetIfChanged(ref _databasePathText, value); }
+    public string LastSyncText { get => _lastSyncText; private set => this.RaiseAndSetIfChanged(ref _lastSyncText, value); }
     public bool IsConfirmDialogVisible { get => _isConfirmDialogVisible; private set => this.RaiseAndSetIfChanged(ref _isConfirmDialogVisible, value); }
     public string ConfirmMessage { get => _confirmMessage; private set => this.RaiseAndSetIfChanged(ref _confirmMessage, value); }
     public IReadOnlyList<string> FilterPeriodOptions { get; } = new[] { "Todo o histórico", "Hoje", "Últimos 7 dias", "Últimos 30 dias" };
@@ -333,7 +341,7 @@ public class MainViewModel : ViewModelBase
         _syncService = new SyncService(_measurementRepository, _reminderRepository, _settingsRepository, _settingsRepository.GetOrCreateSyncDeviceId());
         // Basear do snapshot local: compara com o último enviado para detectar alterações não sincronizadas.
         _lastUploadedSnapshot = _syncService.Serialize(_syncService.BuildLocalSnapshot());
-        ShowAboutCommand = ReactiveCommand.Create(() => { _isAboutSplash = false; this.RaisePropertyChanged(nameof(IsAboutCloseVisible)); IsAboutVisible = true; });
+        ShowAboutCommand = ReactiveCommand.Create(() => { _isAboutSplash = false; this.RaisePropertyChanged(nameof(IsAboutCloseVisible)); RefreshDiagnostics(); IsAboutVisible = true; });
         CloseAboutCommand = ReactiveCommand.Create(() => { IsAboutVisible = false; });
         CancelDeleteCommand = ReactiveCommand.Create(() => { IsConfirmDialogVisible = false; });
         ConfirmDeleteCommand = ReactiveCommand.Create(ExecuteConfirmedDelete);
@@ -371,6 +379,7 @@ public class MainViewModel : ViewModelBase
         {
             _isAboutSplash = true;
             this.RaisePropertyChanged(nameof(IsAboutCloseVisible));
+            RefreshDiagnostics();
             IsAboutVisible = true;
             Observable.Timer(TimeSpan.FromMilliseconds(1800), RxApp.MainThreadScheduler).Subscribe(_ => { _isAboutSplash = false; this.RaisePropertyChanged(nameof(IsAboutCloseVisible)); IsAboutVisible = false; });
         }
@@ -497,6 +506,8 @@ public class MainViewModel : ViewModelBase
             await _supabase.SaveSnapshotAsync(mergedJson);
             _lastUploadedSnapshot = mergedJson;
             _syncService.CompactTombstones();
+            _settingsRepository.SaveLastSyncAtUtc(DateTimeOffset.UtcNow);
+            LastSyncText = DateTimeOffset.UtcNow.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
             if (isStartup) { FinishStartupSplash(); SetSyncBanner("", isError: false); }
         }
         catch (Exception ex)
@@ -597,6 +608,32 @@ public class MainViewModel : ViewModelBase
 
 
     public string BuildLocalSyncJson() => _syncService.Serialize(_syncService.BuildLocalSnapshot());
+
+    private void RefreshDiagnostics()
+    {
+        AppVersion = typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "1.0.0";
+        DatabasePathText = PressioDatabase.Path;
+        try
+        {
+            var fi = new FileInfo(PressioDatabase.Path);
+            DatabaseSizeText = fi.Exists ? FormatBytes(fi.Length) : "—";
+        }
+        catch
+        {
+            DatabaseSizeText = "—";
+        }
+        var lastSync = _settingsRepository.GetLastSyncAtUtc();
+        LastSyncText = lastSync.HasValue ? lastSync.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm") : "Nunca";
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] units = { "B", "KB", "MB", "GB", "TB" };
+        double value = bytes;
+        var unit = 0;
+        while (value >= 1024 && unit < units.Length - 1) { value /= 1024; unit++; }
+        return $"{value:0.#} {units[unit]}";
+    }
 
     /// <summary>Mescla o local com o remoto (string JSON), aplica no banco e retorna o JSON mesclado.</summary>
     public string ApplyRemoteSync(string? remoteJson, bool showMessage = true)

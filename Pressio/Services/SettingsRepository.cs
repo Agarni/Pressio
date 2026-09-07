@@ -46,6 +46,8 @@ public sealed class SettingsRepository
     public void SaveMeasurementDisplayFormat(string format) => Set("MeasurementDisplayFormat", format);
     public void SaveLastExportDirectory(string directory) => Set("LastExportDirectory", directory);
     public void SaveLastSyncDirectory(string directory) => Set("LastSyncDirectory", directory);
+    public DateTimeOffset? GetLastSyncAtUtc() => DateTimeOffset.TryParse(Get("LastSyncAtUtc", string.Empty), out var dto) ? dto : (DateTimeOffset?)null;
+    public void SaveLastSyncAtUtc(DateTimeOffset dto) => Set("LastSyncAtUtc", dto.UtcDateTime.ToString("O"));
 
     private string Get(string key, string defaultValue)
     {

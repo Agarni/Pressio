@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Reactive;
+using System.Threading.Tasks;
 using Pressio.Models;
+using Pressio.Services;
 using ReactiveUI;
 
 namespace Pressio.ViewModels;
@@ -13,6 +15,7 @@ public sealed class MeasurementFormViewModel : ViewModelBase
     {
         SaveCommand = ReactiveCommand.Create(() => SaveRequested?.Invoke());
         CancelCommand = ReactiveCommand.Create(() => CancelRequested?.Invoke());
+        CapturePhotoCommand = ReactiveCommand.CreateFromTask(CaptureFromPhotoAsync);
         foreach (var option in MeasurementContextInfo.AllContexts) ContextOptions.Add(new ContextOption(option.Value, option.Label));
     }
 
@@ -24,6 +27,12 @@ public sealed class MeasurementFormViewModel : ViewModelBase
 
     public ReactiveCommand<Unit, Unit> SaveCommand { get; }
     public ReactiveCommand<Unit, Unit> CancelCommand { get; }
+    public ReactiveCommand<Unit, Unit> CapturePhotoCommand { get; }
+
+    public bool IsCaptureAvailable => MeasurementCapture.Service.IsSupported;
+
+    private bool _isCaptureBusy;
+    public bool IsCaptureBusy { get => _isCaptureBusy; private set => this.RaiseAndSetIfChanged(ref _isCaptureBusy, value); }
 
     // true no mobile: os botões de ação ficam no cabeçalho (Não no rodapé), para o teclado não cobri-los.
     public bool IsMobileLayout { get; set; }
@@ -40,6 +49,37 @@ public sealed class MeasurementFormViewModel : ViewModelBase
     {
         get => _isEditMode;
         set { if (_isEditMode != value) { _isEditMode = value; this.RaisePropertyChanged(nameof(IsEditMode)); this.RaisePropertyChanged(nameof(Title)); } }
+    }
+
+    private async Task CaptureFromPhotoAsync()
+    {
+        if (!IsCaptureAvailable)
+        {
+            MeasurementError = "Leitura por foto não está disponível neste aparelho.";
+            return;
+        }
+        IsCaptureBusy = true;
+        try
+        {
+            var value = await MeasurementCapture.Service.CaptureAndReadAsync();
+            if (value is not null)
+            {
+                BloodPressureInput = value;
+                MeasurementError = string.Empty;
+            }
+            else
+            {
+                MeasurementError = "Não foi possível ler a pressão pela foto. Tente novamente com o monitor nítido e bem iluminado.";
+            }
+        }
+        catch
+        {
+            MeasurementError = "Não foi possível abrir a câmera. Verifique a permissão e tente novamente.";
+        }
+        finally
+        {
+            IsCaptureBusy = false;
+        }
     }
 
     private string _bloodPressureInput = string.Empty;

@@ -207,7 +207,14 @@
           <TextBlock Text="Desenvolvido por Sérgio Luiz" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource PressioTextBrush}" HorizontalAlignment="Center" />
           <TextBlock Text="E-mail: sergio_luiz@outlook.com" FontSize="13" Foreground="{DynamicResource PressioMutedBrush}" HorizontalAlignment="Center" />
           <TextBlock Text="WhatsApp: (16) 99181-3623" FontSize="13" Foreground="{DynamicResource PressioMutedBrush}" HorizontalAlignment="Center" />
-          <TextBlock Text="Versão 1.0" FontSize="11" Foreground="{DynamicResource PressioMutedBrush}" HorizontalAlignment="Center" Margin="0,8,0,0" />
+          <TextBlock Text="{Binding AppVersion, StringFormat='Versão {0}'}" FontSize="11" Foreground="{DynamicResource PressioMutedBrush}" HorizontalAlignment="Center" Margin="0,8,0,0" />
+          <Border Height="1" Background="{DynamicResource PressioBorderBrush}" Width="300" Margin="0,6" />
+          <StackPanel Spacing="4" HorizontalAlignment="Center" Width="340">
+            <TextBlock Text="Diagnóstico" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource PressioTextBrush}" HorizontalAlignment="Center" />
+            <TextBlock Text="{Binding DatabasePathText, StringFormat='Caminho do banco: {0}'}" FontSize="11" Foreground="{DynamicResource PressioMutedBrush}" TextWrapping="Wrap" TextAlignment="Center" />
+            <TextBlock Text="{Binding DatabaseSizeText, StringFormat='Tamanho do banco: {0}'}" FontSize="11" Foreground="{DynamicResource PressioMutedBrush}" TextAlignment="Center" />
+            <TextBlock Text="{Binding LastSyncText, StringFormat='Último sync: {0}'}" FontSize="11" Foreground="{DynamicResource PressioMutedBrush}" TextAlignment="Center" />
+          </StackPanel>
           <Button Classes="primary-button" Content="Fechar" Command="{Binding CloseAboutCommand}" HorizontalContentAlignment="Center" IsVisible="{Binding IsAboutCloseVisible}" />
         </StackPanel>
       </Border>
@@ -222,7 +229,14 @@
         <TextBlock Text="Desenvolvido por Sérgio Luiz" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource PressioTextBrush}" HorizontalAlignment="Center" />
         <TextBlock Text="E-mail: sergio_luiz@outlook.com" FontSize="13" Foreground="{DynamicResource PressioMutedBrush}" HorizontalAlignment="Center" />
         <TextBlock Text="WhatsApp: (16) 99181-3623" FontSize="13" Foreground="{DynamicResource PressioMutedBrush}" HorizontalAlignment="Center" />
-        <TextBlock Text="Versão 1.0" FontSize="11" Foreground="{DynamicResource PressioMutedBrush}" HorizontalAlignment="Center" Margin="0,8,0,0" />
+        <TextBlock Text="{Binding AppVersion, StringFormat='Versão {0}'}" FontSize="11" Foreground="{DynamicResource PressioMutedBrush}" HorizontalAlignment="Center" Margin="0,8,0,0" />
+        <Border Height="1" Background="{DynamicResource PressioBorderBrush}" Width="300" Margin="0,6" />
+        <StackPanel Spacing="4" HorizontalAlignment="Center" Width="340">
+          <TextBlock Text="Diagnóstico" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource PressioTextBrush}" HorizontalAlignment="Center" />
+          <TextBlock Text="{Binding DatabasePathText, StringFormat='Caminho do banco: {0}'}" FontSize="11" Foreground="{DynamicResource PressioMutedBrush}" TextWrapping="Wrap" TextAlignment="Center" />
+          <TextBlock Text="{Binding DatabaseSizeText, StringFormat='Tamanho do banco: {0}'}" FontSize="11" Foreground="{DynamicResource PressioMutedBrush}" TextAlignment="Center" />
+          <TextBlock Text="{Binding LastSyncText, StringFormat='Último sync: {0}'}" FontSize="11" Foreground="{DynamicResource PressioMutedBrush}" TextAlignment="Center" />
+        </StackPanel>
         <Button Classes="primary-button" Content="Fechar" Command="{Binding CloseAboutCommand}" HorizontalContentAlignment="Center" Padding="16" IsVisible="{Binding IsAboutCloseVisible}" />
       </StackPanel></ScrollViewer>
     </Grid>
