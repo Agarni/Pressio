@@ -256,8 +256,5 @@ UPDATE BloodPressureMeasurements SET SyncId = lower(hex(randomblob(16))) WHERE S
 UPDATE BloodPressureMeasurements SET PatientSyncId = (SELECT SyncId FROM Patients WHERE Patients.Id = BloodPressureMeasurements.PatientId) WHERE PatientSyncId IS NULL OR PatientSyncId = '';
 UPDATE BloodPressureMeasurements SET UpdatedAtUtc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE UpdatedAtUtc IS NULL OR UpdatedAtUtc = '';";
         backfill.ExecuteNonQuery();
-
-        using var count = connection.CreateCommand(); count.CommandText = "SELECT COUNT(*) FROM Patients WHERE Deleted=0";
-        if (Convert.ToInt64(count.ExecuteScalar()) == 0) AddPatient("Meu perfil", null, null);
     }
 }

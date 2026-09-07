@@ -899,25 +899,32 @@ public class MainViewModel : ViewModelBase
     private void ExecuteConfirmedDelete()
     {
         IsConfirmDialogVisible = false;
-        switch (_pendingConfirmation)
+        try
         {
-            case ConfirmationAction.DeleteMeasurement:
-                if (SelectedMeasurement is { Id: > 0 } measurement)
-                {
-                    _measurementRepository.Delete(measurement.Id);
-                    SelectedMeasurement = null;
-                    ReloadMeasurements();
-                }
-                break;
-            case ConfirmationAction.DeletePatient:
-                if (_pendingDeletePatientId is { } patientId)
-                {
-                    _measurementRepository.DeletePatient(patientId);
-                    ReloadPatients();
-                    ReloadMeasurements();
-                    RefreshProfileList();
-                }
-                break;
+            switch (_pendingConfirmation)
+            {
+                case ConfirmationAction.DeleteMeasurement:
+                    if (SelectedMeasurement is { Id: > 0 } measurement)
+                    {
+                        _measurementRepository.Delete(measurement.Id);
+                        SelectedMeasurement = null;
+                        ReloadMeasurements();
+                    }
+                    break;
+                case ConfirmationAction.DeletePatient:
+                    if (_pendingDeletePatientId is { } patientId)
+                    {
+                        _measurementRepository.DeletePatient(patientId);
+                        ReloadPatients();
+                        ReloadMeasurements();
+                        RefreshProfileList();
+                    }
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Notify("Não foi possível concluir a ação: " + ex.Message, "Erro");
         }
         _pendingConfirmation = ConfirmationAction.None;
     }

@@ -49,7 +49,8 @@ public sealed class SyncTests : IDisposable
     public void Add_GeneratesUniqueSyncIds()
     {
         var repo = new MeasurementRepository(_dbPath);
-        var patient = repo.GetPatients().Single();
+        var firstId = repo.AddPatient("Ana", null, null);
+        var patient = repo.GetPatients().Single(p => p.Id == firstId);
         var secondId = repo.AddPatient("João", null, null);
         repo.Add(new BloodPressureMeasurement(150, 90, DateTime.Now, MedicationTiming.BeforeMedication), patient.Id);
         repo.Add(new BloodPressureMeasurement(120, 80, DateTime.Now, MedicationTiming.AfterMedication), secondId);
@@ -122,7 +123,8 @@ public sealed class SyncTests : IDisposable
         var repository = new MeasurementRepository(_dbPath);
         var reminders = new ReminderRepository(_dbPath);
         var settings = new SettingsRepository(_dbPath);
-        var patient = repository.GetPatients().Single();
+        var patientId = repository.AddPatient("Ana", null, null);
+        var patient = repository.GetPatients().Single(p => p.Id == patientId);
         repository.Add(new BloodPressureMeasurement(140, 90, DateTime.Now, MedicationTiming.NotInformed), patient.Id);
         reminders.Add(new Reminder(0, new TimeSpan(8, 0, 0), ReminderDays.All, true, "manhã"));
 
@@ -164,16 +166,18 @@ public sealed class SyncTests : IDisposable
         var repo = new MeasurementRepository(_dbPath);
         var reminders = new ReminderRepository(_dbPath);
         var settings = new SettingsRepository(_dbPath);
+        repo.AddPatient("Ana", null, null);
         var svc = new SyncService(repo, reminders, settings, "dev");
         var merged = svc.ApplyRemote(null);
-        Assert.Single(merged.Patients); // o "Meu perfil" local
+        Assert.Single(merged.Patients); // o perfil local criado
     }
 
     [Fact]
     public void CompactTombstones_RemovesOldKeepsRecent()
     {
         var repo = new MeasurementRepository(_dbPath);
-        var patient = repo.GetPatients().Single();
+        var patientId = repo.AddPatient("Ana", null, null);
+        var patient = repo.GetPatients().Single(p => p.Id == patientId);
         var oldId = repo.Add(new BloodPressureMeasurement(140, 90, DateTime.Now, MedicationTiming.NotInformed), patient.Id);
         repo.Delete(oldId);
         using (var conn = new SqliteConnection($"Data Source={_dbPath}"))
@@ -277,7 +281,8 @@ public sealed class SyncTests : IDisposable
         try
         {
             var ma = new MeasurementRepository(dbA);
-            var pa = ma.GetPatients().Single();
+            var paId = ma.AddPatient("Ana", null, null);
+            var pa = ma.GetPatients().Single(p => p.Id == paId);
             ma.AddPatient("João", null, null);
             ma.Add(new BloodPressureMeasurement(160, 100, DateTime.Now, MedicationTiming.NotInformed), pa.Id);
             var svcA = new SyncService(ma, new ReminderRepository(dbA), new SettingsRepository(dbA), "dev-a");

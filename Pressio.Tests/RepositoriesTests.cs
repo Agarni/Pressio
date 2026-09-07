@@ -21,7 +21,8 @@ public sealed class RepositoriesTests : IDisposable
     public void MeasurementRepository_AddGetUpdateDelete()
     {
         var repo = new MeasurementRepository(_dbPath);
-        var patient = repo.GetPatients().Single(); // auto-criado "Meu perfil"
+        repo.AddPatient("Teste", null, null);
+        var patient = repo.GetPatients().Single();
 
         var id = repo.Add(new BloodPressureMeasurement(154, 102, DateTime.Now, MedicationTiming.BeforeMedication, "Dor de cabeça", MeasurementContext.Stress | MeasurementContext.PoorSleep, 72, true, Arm.Right, BodyPosition.Seated), patient.Id);
         Assert.True(id > 0);
@@ -52,7 +53,7 @@ public sealed class RepositoriesTests : IDisposable
     public void MeasurementRepository_MultiplePatients()
     {
         var repo = new MeasurementRepository(_dbPath);
-        var first = repo.GetPatients().Single();
+        repo.AddPatient("Ana", null, null);
         var id2 = repo.AddPatient("João", new DateTime(1990, 5, 10), "observação");
         Assert.True(id2 > 0);
         var john = repo.GetPatients().First(p => p.Name == "João");
