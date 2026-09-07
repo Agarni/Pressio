@@ -61,15 +61,20 @@ public sealed class MeasurementFormViewModel : ViewModelBase
         IsCaptureBusy = true;
         try
         {
-            var value = await MeasurementCapture.Service.CaptureAndReadAsync();
-            if (value is not null)
+            var result = await MeasurementCapture.Service.CaptureAndReadAsync();
+            if (result.Value is not null)
             {
-                BloodPressureInput = value;
+                BloodPressureInput = result.Value;
                 MeasurementError = string.Empty;
+            }
+            else if (!string.IsNullOrWhiteSpace(result.RawText))
+            {
+                var raw = result.RawText.Replace('\n', ' ').Replace('\r', ' ');
+                MeasurementError = $"Não consegui identificar a pressão. O reconhecimento retornou: \"{raw}\"";
             }
             else
             {
-                MeasurementError = "Não foi possível ler a pressão pela foto. Tente novamente com o monitor nítido e bem iluminado.";
+                MeasurementError = "Não consegui ler a pressão. Tente com o monitor nítido, iluminado e em foco.";
             }
         }
         catch

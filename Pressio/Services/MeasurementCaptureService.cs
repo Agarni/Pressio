@@ -4,13 +4,19 @@ using System.Threading.Tasks;
 
 namespace Pressio.Services;
 
+public sealed record CaptureReadingResult(string? Value, string? RawText)
+{
+    public static readonly CaptureReadingResult None = new(null, null);
+}
+
 public interface IMeasurementCaptureService
 {
     // true quando a plataforma tem câmera + OCR (ex.: iOS com Vision).
     bool IsSupported { get; }
 
-    // Mostra/abre o fluxo de captura (câmera) e lê a pressão. Retorna "130/80" (ou null se não leu).
-    Task<string?> CaptureAndReadAsync();
+    // Mostra/abre o fluxo de captura (câmera) e lê a pressão. Value = "130/80" (ou null se não parseou);
+    // RawText = o que o OCR reconheceu (para diagnóstico).
+    Task<CaptureReadingResult> CaptureAndReadAsync();
 }
 
 public static class MeasurementCapture
@@ -21,7 +27,7 @@ public static class MeasurementCapture
     private sealed class EmptyMeasurementCaptureService : IMeasurementCaptureService
     {
         public bool IsSupported => false;
-        public Task<string?> CaptureAndReadAsync() => Task.FromResult<string?>(null);
+        public Task<CaptureReadingResult> CaptureAndReadAsync() => Task.FromResult(CaptureReadingResult.None);
     }
 }
 
