@@ -36,25 +36,45 @@ public static class DashboardCalculator
         return result;
     }
 
-    public static IReadOnlyList<CorrelationInfo> Correlations(IReadOnlyList<BloodPressureMeasurement> items)
+    // Correlação com defasagem temporal: para cada fator, compara a pressão das leituras feitas
+    // nas horas seguintes ao fator com a de leituras sem o fator recente. Exige um mínimo de
+    // amostras por grupo (significância) e marca como "tendência" quando a amostra é pequena.
+    public static IReadOnlyList<CorrelationInfo> Correlations(
+        IReadOnlyList<BloodPressureMeasurement> items,
+        TimeSpan? lagWindow = null,
+        int minPerGroup = 3)
     {
+        var window = lagWindow ?? TimeSpan.FromHours(6);
         var result = new List<CorrelationInfo>();
         foreach (var (value, label) in MeasurementContextInfo.AllContexts)
         {
-            var with = items.Where(x => (x.Context & value) != 0).ToList();
-            if (with.Count < 2) continue;
-            var without = items.Where(x => (x.Context & value) == 0).ToList();
-            if (without.Count < 2) continue;
-            var ws = (int)Math.Round(with.Average(x => x.Systolic), MidpointRounding.AwayFromZero);
-            var wd = (int)Math.Round(with.Average(x => x.Diastolic), MidpointRounding.AwayFromZero);
-            var ns = (int)Math.Round(without.Average(x => x.Systolic), MidpointRounding.AwayFromZero);
-            var nd = (int)Math.Round(without.Average(x => x.Diastolic), MidpointRounding.AwayFromZero);
+            var exposures = items.Where(x => (x.Context & value) != 0).ToList();
+            if (exposures.Count == 0) continue;
+
+            var exposed = new List<BloodPressureMeasurement>();
+            var unexposed = new List<BloodPressureMeasurement>();
+            foreach (var m in items)
+            {
+                // A própria leitura que marcou o fator é "exposição": não entra em grupo nenhum.
+                if ((m.Context & value) != 0) continue;
+                var isExposed = exposures.Any(e => m.MeasuredAt > e.MeasuredAt && m.MeasuredAt <= e.MeasuredAt + window);
+                (isExposed ? exposed : unexposed).Add(m);
+            }
+
+            if (exposed.Count < minPerGroup || unexposed.Count < minPerGroup) continue;
+
+            var ws = (int)Math.Round(exposed.Average(x => x.Systolic), MidpointRounding.AwayFromZero);
+            var wd = (int)Math.Round(exposed.Average(x => x.Diastolic), MidpointRounding.AwayFromZero);
+            var ns = (int)Math.Round(unexposed.Average(x => x.Systolic), MidpointRounding.AwayFromZero);
+            var nd = (int)Math.Round(unexposed.Average(x => x.Diastolic), MidpointRounding.AwayFromZero);
             var ds = ws - ns;
             var dd = wd - nd;
             if (ds == 0 && dd == 0) continue;
+
             var delta = $"{(ds >= 0 ? "+" : "")}{ds}/{(dd >= 0 ? "+" : "")}{dd}";
-            var detail = $"com: {with.Count}x {BloodPressureMeasurement.Format(ws, wd)}  ·  sem: {without.Count}x {BloodPressureMeasurement.Format(ns, nd)}";
-            result.Add(new CorrelationInfo(label, delta, detail, ds > 0 || dd > 0, ds, dd));
+            var detail = $"nas {window.TotalHours:0}h: {exposed.Count}x {BloodPressureMeasurement.Format(ws, wd)}  ·  sem fator: {unexposed.Count}x {BloodPressureMeasurement.Format(ns, nd)}";
+            var isTrend = exposed.Count < 5 || unexposed.Count < 5;
+            result.Add(new CorrelationInfo(label, delta, detail, ds > 0 || dd > 0, ds, dd, isTrend));
         }
         return result
             .OrderByDescending(c => Math.Max(Math.Abs(c.DeltaSys), Math.Abs(c.DeltaDia)))

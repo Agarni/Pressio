@@ -47,30 +47,56 @@ public class DashboardCalculatorTests
     }
 
     [Fact]
-    public void Correlations_ComparesWithAndWithoutFactor()
+    public void Correlations_ComparesAfterFactorVsNoRecentFactor()
     {
+        // Café às 8h. Leituras nas 2h seguintes (expostas) 130/135 vs. sem café recente 125/122.
+        var baseDay = new DateTime(2026, 9, 1, 6, 0, 0);
         var items = new List<BloodPressureMeasurement>
         {
-            M(130, 85, DateTime.Now, MeasurementContext.Caffeine),
-            M(135, 88, DateTime.Now, MeasurementContext.Caffeine),
-            M(125, 80, DateTime.Now, MeasurementContext.None),
-            M(122, 78, DateTime.Now, MeasurementContext.None),
+            M(130, 86, baseDay, MeasurementContext.Caffeine),                      // exposição (não entra nos grupos)
+            M(132, 88, baseDay.AddHours(1), MeasurementContext.None),              // exposto após
+            M(136, 90, baseDay.AddHours(2), MeasurementContext.None),              // exposto após
+            M(138, 92, baseDay.AddHours(3), MeasurementContext.None),              // exposto após
+            M(125, 80, baseDay.AddDays(1), MeasurementContext.None),               // sem fator recente
+            M(122, 78, baseDay.AddDays(2), MeasurementContext.None),               // sem fator recente
+            M(124, 79, baseDay.AddDays(3), MeasurementContext.None),               // sem fator recente
         };
         var correlations = DashboardCalculator.Correlations(items);
         Assert.Single(correlations);
         var c = correlations[0];
         Assert.Equal("Café ou energético", c.Label);
-        Assert.True(c.Raises); // com café mais alto que sem
-        Assert.Equal(9, c.DeltaSys); // 132 vs 124 (arredondados)
+        Assert.True(c.Raises); // expostos mais altos que sem fator
+        Assert.Equal(11, c.DeltaSys); // ~135 vs ~124
+        Assert.True(c.IsTrend); // 3 (expostos) < 5 e 3 (sem) < 5 -> tendência
     }
 
     [Fact]
-    public void Correlations_RequiresTwoEachSide()
+    public void Correlations_ReadingAfterWindowIsUnexposed()
     {
+        // Café às 8h, mas a leitura só às 16h (> 6h): não é exposta.
+        var baseDay = new DateTime(2026, 9, 1, 8, 0, 0);
         var items = new List<BloodPressureMeasurement>
         {
-            M(130, 85, DateTime.Now, MeasurementContext.Caffeine),
-            M(125, 80, DateTime.Now, MeasurementContext.None),
+            M(128, 84, baseDay, MeasurementContext.Caffeine),
+            M(150, 100, baseDay.AddHours(8), MeasurementContext.None),
+            M(120, 80, baseDay.AddDays(1), MeasurementContext.None),
+            M(122, 82, baseDay.AddDays(2), MeasurementContext.None),
+            M(121, 81, baseDay.AddDays(3), MeasurementContext.None),
+        };
+        var correlations = DashboardCalculator.Correlations(items);
+        // a única leitura exposta é a de 8h depois; expostos = 1 (<3) -> nenhuma correlação.
+        Assert.Empty(correlations);
+    }
+
+    [Fact]
+    public void Correlations_RequiresMinPerGroup()
+    {
+        var baseDay = new DateTime(2026, 9, 1, 6, 0, 0);
+        var items = new List<BloodPressureMeasurement>
+        {
+            M(130, 85, baseDay, MeasurementContext.Caffeine),
+            M(135, 88, baseDay.AddHours(1), MeasurementContext.None),
+            M(125, 80, baseDay.AddDays(1), MeasurementContext.None),
         };
         Assert.Empty(DashboardCalculator.Correlations(items));
     }

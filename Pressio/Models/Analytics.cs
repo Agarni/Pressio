@@ -6,8 +6,9 @@ public sealed record TimeSlotInfo(string Label, int Count, string AverageText);
 
 public sealed record ContextCountInfo(string Label, int Count);
 
-// Diferença da média de pressão (sistólica/diastólica) nos registros com um fator vs sem ele.
-public sealed record CorrelationInfo(string Label, string Delta, string Detail, bool Raises, int DeltaSys, int DeltaDia);
+// Diferença da média de pressão (sistólica/diastólica) nas horas seguintes a um fator,
+// em relação a leituras sem o fator recente. IsTrend indica amostragem pequena (apenas um indício).
+public sealed record CorrelationInfo(string Label, string Delta, string Detail, bool Raises, int DeltaSys, int DeltaDia, bool IsTrend);
 
 public sealed record ChartPointLabel(string Text, int X, int Y)
 {
