@@ -994,41 +994,9 @@ public class MainViewModel : ViewModelBase
 
     private void ApplyFilters()
     {
-        IEnumerable<BloodPressureMeasurement> query = _sourceMeasurements;
-
-        (DateTime Start, DateTime End)? range = FilterPeriod switch
-        {
-            "Hoje" => (DateTime.Today, DateTime.Today),
-            "Últimos 7 dias" => (DateTime.Today.AddDays(-6), DateTime.Today),
-            "Últimos 30 dias" => (DateTime.Today.AddDays(-29), DateTime.Today),
-            _ => null
-        };
-        if (range is { } active) query = query.Where(m => m.MeasuredAt.Date >= active.Start && m.MeasuredAt.Date <= active.End);
-
-        query = FilterMedication switch
-        {
-            "Antes da medicação" => query.Where(m => m.MedicationTiming == MedicationTiming.BeforeMedication),
-            "Depois da medicação" => query.Where(m => m.MedicationTiming == MedicationTiming.AfterMedication),
-            "Não informado" => query.Where(m => m.MedicationTiming == MedicationTiming.NotInformed),
-            "Não se aplica" => query.Where(m => m.MedicationTiming == MedicationTiming.NotApplicable),
-            _ => query
-        };
-
-        query = FilterTimeOfDay switch
-        {
-            "Madrugada" => query.Where(m => m.MeasuredAt.Hour < 6),
-            "Manhã" => query.Where(m => m.MeasuredAt.Hour >= 6 && m.MeasuredAt.Hour < 12),
-            "Tarde" => query.Where(m => m.MeasuredAt.Hour >= 12 && m.MeasuredAt.Hour < 18),
-            "Noite" => query.Where(m => m.MeasuredAt.Hour >= 18),
-            _ => query
-        };
-
-        var search = FilterSearch?.Trim();
-        if (!string.IsNullOrWhiteSpace(search))
-            query = query.Where(m => m.Notes?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false);
-
+        var filtered = MeasurementFilter.Apply(_sourceMeasurements, FilterPeriod, FilterMedication, FilterTimeOfDay, FilterSearch, DateTime.Today);
         Measurements.Clear();
-        foreach (var measurement in query) Measurements.Add(measurement);
+        foreach (var measurement in filtered) Measurements.Add(measurement);
         RefreshDashboard();
     }
 
@@ -1165,11 +1133,9 @@ public class MainViewModel : ViewModelBase
     private void CheckDueReminders()
     {
         var now = DateTime.Now;
-        var dayFlag = NowToReminderDay(now.DayOfWeek);
         foreach (var item in Reminders)
         {
-            if (!item.Enabled || item.Days == ReminderDays.None || (item.Days & dayFlag) == 0) continue;
-            if (Math.Abs((item.Time - now.TimeOfDay).TotalMinutes) >= 1) continue;
+            if (!ReminderDueCalculator.IsDue(item.Enabled, item.Days, item.Time, now)) continue;
             if (!_firedReminders.Add((item.Id, now.Date))) continue;
             var message = "" + item.DisplayTime + " — hora de aferir a pressão" + (string.IsNullOrWhiteSpace(item.Note) ? "" : "\n" + item.Note);
             ReminderNoticeMessage = message;
@@ -1193,18 +1159,6 @@ public class MainViewModel : ViewModelBase
         if (IsMeasurementFormVisible) { IsMeasurementFormVisible = false; return true; }
         return false;
     }
-
-    private static ReminderDays NowToReminderDay(DayOfWeek day) => day switch
-    {
-        DayOfWeek.Sunday => ReminderDays.Sunday,
-        DayOfWeek.Monday => ReminderDays.Monday,
-        DayOfWeek.Tuesday => ReminderDays.Tuesday,
-        DayOfWeek.Wednesday => ReminderDays.Wednesday,
-        DayOfWeek.Thursday => ReminderDays.Thursday,
-        DayOfWeek.Friday => ReminderDays.Friday,
-        DayOfWeek.Saturday => ReminderDays.Saturday,
-        _ => ReminderDays.None
-    };
 
     private static string DescribeMedicationTiming(MedicationTiming timing) => timing switch
     {
