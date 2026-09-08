@@ -19,6 +19,15 @@
 - ✔ **Classificação por faixas** — cada leitura ganha um chip colorido (Ótima/Normal/Elevada/Hipertensão 1–3, 7ª Diretriz SBC 2020), na última pressão e na coluna "Classificação" do CSV.
 - ✔ **Médias por horário** — média de pressão por Madrugada/Manhã/Tarde/Noite no dashboard, respeitando o filtro de período (Todo/Hoje/7/30 dias).
 - ✔ **Carta ao médico** — PDF curto e limpo: resumo clínico (média, última, antes/depois, por horário), distribuição por faixa, legenda das faixas (SBC) e as leituras mais relevantes.
+- ✔ **PDF multiplataforma (PDFsharp)** — relatório e carta gerados por lib 100% gerenciada (funciona em desktop/iOS/Android); gráfico com eixos + linha de referência 140/90, "Página X de Y", coluna FC e estatísticas (máx/mín, % ≥140/90, FC média). O SkiaSharp PDF crashava nativo no Android, então foi migrado.
+- ✔ **Export gravando em todas as plataformas** — `StorageWriter`: Android via `ContentResolver` (SAF), iOS/desktop via `OpenWriteAsync`.
+- ✔ **Folha de opções do relatório (mobile)** — botão único "Mais opções de relatório" abre uma sheet (estilo diálogo) com período + Carta/PDF/CSV/Saúde e "X" para fechar.
+- ✔ **Gestos no mobile** — swipe da borda esquerda → voltar (dispensa o botão) e toque na barra de status → rolar ao topo.
+- ✔ **Apple Health (iOS)** — exportar as medições para o app Saúde (HealthKit), sem conta de terceiros.
+- ✔ **Android "Pressio"** — renomeado (não "Pressio.Android") e splash com o ícone do app (não o logo Avalonia).
+- ✔ **Correlações com defasagem temporal + significância** — compara a pressão nas horas seguintes ao fator vs. sem o fator recente; mín. de amostras e selo "Tendência".
+- ✔ **Testes de integração (lógica)** — `MeasurementFilter` (filtros) e `ReminderDueCalculator` (lembretes devidos) extraídos e testados; dashboard já coberto.
+- ✔ **Tela "Sobre" com diagnóstico** — versão, caminho/tamanho do banco e último sync.
 
 ---
 
@@ -44,21 +53,21 @@ Alternativas sem servidor (candidatas, da mais simples à mais robusta):
 
 ## 2. Utilidade (valor imediato)
 
-- **Insights de correlação** 🟡 — "sua média sobe X mmHg nos dias com café/estresse" usando os contextos que já capturamos (estatística simples local, sem IA).
+- ✔ **Insights de correlação** — compara a pressão média nas horas seguintes a cada fator (café, estresse etc.) com as sem o fator recente; mínimo de amostras por grupo e selo "Tendência" quando a amostra é pequena.
 - **Lembrete pós-consulta** 🟢 — sugestão de nova rotina/aferição ao final.
-- **Histórico com mais contexto no gráfico** 🟡 — pontos coloridos por faixa e marcadores de contexto (medicação, fatores).
+- ✔ **Histórico com mais contexto no gráfico** — pontos coloridos por faixa e seletor de período (Hoje/7/15/30 dias) no gráfico.
 
 ## 3. Inovação (diferenciação)
 
-- **Leitura por foto do monitor** 🔴 — câmera + OCR (Vision no iOS/macOS, ML Kit no Android) para preencher automaticamente. Altamente diferencial; havia sido adiado, mas é viável com as APIs nativas.
-- **Apple Health / Google Fit** 🔴 — exportar as medições para as plataformas de saúde nativas. Bom alcance; exige APIs de saúde e permissões.
-- **Perfis familiares comparativos** 🟡 — comparar gráficos de vários pacientes (já há suporte a múltiplos perfis).
+- **Leitura por foto do monitor** 🔴 — câmera + OCR para preencher automaticamente. **Protótipo no iOS** (câmera + Vision + decodificador 7-segmentos), mas a leitura automática não ficou confiável (display de 7 segmentos varia entre aparelhos) — **pausado**; botão oculto no form. Reavaliar com Tesseract/segmentação dedicada.
+- ✔ **Apple Health (iOS)** — exportar para o app Saúde via HealthKit (sem conta). *Google Fit/Health Connect (Android): **deixado de lado** — a lib `connect-client` usa corrotinas e a escrita crasha em device; scaffold pronto (stub).*
+- **Perfis familiares comparativos** 🟡 — comparar gráficos de vários pacientes. **Em standby** (pouco usado; usuário costuma registrar só o próprio).
 - **Insights por IA (LLM)** 🔴 — resumo em linguagem natural; opcional (nuvem/tokenizado) ou heurísticas locais.
 
 ## 4. Fundação / robustez
 
-- **Testes de integração do `MainViewModel`** 🟡 — cobrir agendamento de lembretes, filtros e dashboard (hoje só parser/repos têm teste).
-- **Tela "Sobre" com diagnóstico** 🟢 — versão, tamanho do banco, último sync, caminho do banco.
+- ✔ **Testes de integração (lógica)** — `MeasurementFilter` (período/medicação/horário/busca), `ReminderDueCalculator` (lembrete devido) e `DashboardCalculator` isolados e testáveis (filtros/lembretes/dashboard).
+- ✔ **Tela "Sobre" com diagnóstico** — versão, caminho/tamanho do banco, último sync.
 - **Multi-idioma (pt/en)** 🔴 — pós-estabilização.
 
 ---
@@ -67,5 +76,5 @@ Alternativas sem servidor (candidatas, da mais simples à mais robusta):
 
 1. 🔴 **Sincronização na nuvem (Supabase)** — implementada (Auth + RLS por usuário).
 2. 🟢 **Faixas de classificação** + 🟢 **média móvel por horário** — rápidas e visíveis.
-3. 🟡 **Correlações** + 🟡 **testes de integração**.
-4. 🔴 **Leitura por foto** (após a sincronia estabilizar).
+3. 🟡 **Correlações com defasagem temporal** + 🟡 **testes de integração** — implementados.
+4. 🔴 **PDF multiplataforma (PDFsharp)** + **Apple Health (iOS)** — implementados.
