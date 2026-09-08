@@ -260,6 +260,8 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> ExportCsvCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ExportPdfCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ExportLetterCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> SendToHealthCommand { get; private set; } = null!;
+    public bool IsHealthExportAvailable => HealthExport.Service.IsSupported;
     public ReactiveCommand<Unit, Unit> BackupCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> RestoreCommand { get; private set; } = null!;
     public Interaction<ExportFileRequest, IStorageFile?> ExportFileInteraction { get; } = new();
@@ -387,6 +389,7 @@ public class MainViewModel : ViewModelBase
         ExportCsvCommand = ReactiveCommand.CreateFromTask(ExportCsv);
         ExportPdfCommand = ReactiveCommand.CreateFromTask(ExportPdf);
         ExportLetterCommand = ReactiveCommand.CreateFromTask(ExportLetter);
+        SendToHealthCommand = ReactiveCommand.CreateFromTask(SendToHealth);
         BackupCommand = ReactiveCommand.CreateFromTask(Backup);
         RestoreCommand = ReactiveCommand.CreateFromTask(Restore);
         LoadAppSettings();
@@ -791,6 +794,23 @@ public class MainViewModel : ViewModelBase
         var last = _settingsRepository.GetLastPatientId();
         SelectedPatient = last != 0 && Patients.FirstOrDefault(p => p.Id == last) is { } p ? p : Patients.FirstOrDefault();
         if (IsProfileListVisible) RefreshProfileList();
+    }
+
+    private async Task SendToHealth()
+    {
+        if (SelectedPatient is null || Measurements.Count == 0) { Notify("Não há medições para enviar."); return; }
+        if (!HealthExport.Service.IsSupported) { Notify("Esta plataforma ainda não suporta o app Saúde."); return; }
+        if (!await HealthExport.Service.RequestAuthorizationAsync())
+        {
+            Notify("Permissão de Saúde não concedida. Habilite em Ajustes → Saúde → Pressio.", "App Saúde");
+            return;
+        }
+        var readings = Measurements
+            .OrderBy(m => m.MeasuredAt)
+            .Select(m => new HealthReading(m.Systolic, m.Diastolic, m.MeasuredAt, m.HeartRate))
+            .ToList();
+        var ok = await HealthExport.Service.ExportAsync(readings);
+        Notify(ok ? $"{readings.Count} medição(ões) enviada(s) ao app Saúde." : "Não foi possível enviar as medições ao app Saúde.", "App Saúde");
     }
 
     private async Task ExportCsv()

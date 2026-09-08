@@ -57,6 +57,10 @@
 	<string>Usamos a câmera para ler os números do seu monitor de pressão.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Permita o acesso às fotos para ler uma imagem do monitor de pressão.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Usamos o Saúke para enviar suas medições de pressão arterial.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Usamos o Saúde para salvar suas medições de pressão arterial.</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
