@@ -14,7 +14,7 @@ using ReactiveUI.Avalonia;
 namespace Pressio.Android;
 
 [Activity(
-    Label = "Pressio.Android",
+    Label = "Pressio",
     Theme = "@style/MyTheme.NoActionBar",
     Icon = "@drawable/icon",
     MainLauncher = true,
