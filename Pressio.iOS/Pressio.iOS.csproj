@@ -6,7 +6,6 @@
     <Nullable>enable</Nullable>
     <ApplicationTitle>Pressio</ApplicationTitle>
     <ApplicationId>agarnidev.Pressio</ApplicationId>
-    <CodesignEntitlements>Entitlements.plist</CodesignEntitlements>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <CodesignKey>iPhone Developer</CodesignKey>
