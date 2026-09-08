@@ -802,14 +802,15 @@ public class MainViewModel : ViewModelBase
     {
         if (SelectedPatient is null || Measurements.Count == 0) { Notify("Não há medições para exportar."); return; }
         var options = new List<string> { "Carta ao médico", "Exportar PDF", "Exportar CSV" };
-        if (IsHealthExportAvailable) options.Add("Enviar para Saúde");
+        var healthLabel = $"Enviar {SelectedPatient!.Name} para o Saúde";
+        if (IsHealthExportAvailable) options.Add(healthLabel);
         var choice = await Dialog.ShowOptionsAsync("Relatório do usuário", options, "Fechar");
         switch (choice)
         {
             case "Carta ao médico": await ExportLetter(); break;
             case "Exportar PDF": await ExportPdf(); break;
             case "Exportar CSV": await ExportCsv(); break;
-            case "Enviar para Saúde": await SendToHealth(); break;
+            case var c when c == healthLabel: await SendToHealth(); break;
         }
     }
 
@@ -827,7 +828,9 @@ public class MainViewModel : ViewModelBase
             .Select(m => new HealthReading(m.Systolic, m.Diastolic, m.MeasuredAt, m.HeartRate))
             .ToList();
         var ok = await HealthExport.Service.ExportAsync(readings);
-        Notify(ok ? $"{readings.Count} medição(ões) enviada(s) ao app Saúde." : "Não foi possível enviar as medições ao app Saúde.", "App Saúde");
+        Notify(ok
+            ? $"{readings.Count} medição(ões) de {SelectedPatient!.Name} enviada(s) ao app Saúde."
+            : "Não foi possível enviar as medições ao app Saúde.", "App Saúde");
     }
 
     private async Task ExportCsv()
