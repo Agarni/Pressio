@@ -30,8 +30,9 @@ public sealed class DialogService : ViewModelBase
 
     private bool _isVisible;
     public bool IsVisible { get => _isVisible; set { if (this.RaiseAndSetIfChanged(ref _isVisible, value)) this.RaisePropertyChanged(nameof(IsCancelVisible)); } }
-    public bool IsCancelVisible => IsVisible && !_optionsMode;
+    public bool IsCancelVisible => IsVisible && (_confirming || _optionsMode);
 
+    private bool _confirming;
     private bool _optionsMode;
     public bool IsOptionsMode { get => _optionsMode; private set { if (this.RaiseAndSetIfChanged(ref _optionsMode, value)) this.RaisePropertyChanged(nameof(IsCancelVisible)); } }
 
@@ -52,6 +53,7 @@ public sealed class DialogService : ViewModelBase
     public Task<bool> ConfirmAsync(string title, string message, string confirmText = "OK", string cancelText = "Cancelar")
     {
         IsOptionsMode = false;
+        _confirming = true;
         Title = title;
         Message = message;
         ConfirmText = confirmText;
@@ -64,6 +66,7 @@ public sealed class DialogService : ViewModelBase
     public Task ShowInfoAsync(string title, string message, string confirmText = "OK")
     {
         IsOptionsMode = false;
+        _confirming = false;
         Title = title;
         Message = message;
         ConfirmText = confirmText;
@@ -76,6 +79,7 @@ public sealed class DialogService : ViewModelBase
     public Task<string?> ShowOptionsAsync(string title, System.Collections.Generic.IReadOnlyList<string> options, string cancelText = "Fechar")
     {
         IsOptionsMode = true;
+        _confirming = false;
         Title = title;
         Message = string.Empty;
         CancelText = cancelText;
