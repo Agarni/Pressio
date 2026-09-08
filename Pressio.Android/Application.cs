@@ -18,6 +18,7 @@ namespace Pressio.Android
         {
             Notifications.Service = new AndroidNotificationService(this);
             HealthExport.Service = new AndroidHealthExportService();
+            StorageWriter.Service = new AndroidStorageWriter();
             return base.CustomizeAppBuilder(builder)
             .WithInterFont()
             .UseReactiveUI();

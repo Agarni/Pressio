@@ -844,7 +844,8 @@ public class MainViewModel : ViewModelBase
             var rows = new[] { "Pressão;Data e hora;Medicação;Classificação;Contexto;Observação" }.Concat(report.Select(m =>
                 $"{m.DisplayValue};{m.DisplayDate};{DescribeMedicationTiming(m.MedicationTiming)};{m.CategoryLabel};{(m.HasContext ? m.DisplayContext : "—")};{m.Notes?.Replace(';', ',') ?? string.Empty}"));
             var bytes = System.Text.Encoding.UTF8.GetBytes(string.Join(Environment.NewLine, rows) + Environment.NewLine);
-            await WriteExportFile(file, s => s.Write(bytes, 0, bytes.Length), p => System.IO.File.WriteAllBytes(p, bytes));
+            var ok = await StorageWriter.Service.WriteAsync(file, bytes);
+            if (!ok) throw new InvalidOperationException("Não foi possível gravar o arquivo.");
         }
         catch (Exception ex) { Notify("Falha ao salvar o CSV: " + ex.Message, "Exportar CSV"); return; }
         SaveExportDirectory(file);
@@ -860,9 +861,8 @@ public class MainViewModel : ViewModelBase
         if (file is null) { Notify("Exportação cancelada."); return; }
         try
         {
-            await WriteExportFile(file,
-                s => PdfReportService.Export(s, SelectedPatient, report, ReportDescription(report), truncated),
-                p => PdfReportService.Export(p, SelectedPatient, report, ReportDescription(report), truncated));
+            var ok = await ExportPdfBytes(file, SelectedPatient, report, ReportDescription(report), truncated);
+            if (!ok) throw new InvalidOperationException("Não foi possível gravar o arquivo.");
         }
         catch (Exception ex) { Notify("Falha ao gerar o PDF: " + ex.Message, "Exportar PDF"); return; }
         SaveExportDirectory(file);
@@ -878,26 +878,26 @@ public class MainViewModel : ViewModelBase
         if (file is null) { Notify("Exportação cancelada."); return; }
         try
         {
-            await WriteExportFile(file,
-                s => PdfReportService.ExportDoctorLetter(s, SelectedPatient, report, ReportDescription(report)),
-                p => PdfReportService.ExportDoctorLetter(p, SelectedPatient, report, ReportDescription(report)));
+            var ok = await ExportLetterBytes(file, SelectedPatient, report, ReportDescription(report));
+            if (!ok) throw new InvalidOperationException("Não foi possível gravar o arquivo.");
         }
         catch (Exception ex) { Notify("Falha ao gerar a carta: " + ex.Message, "Carta ao médico"); return; }
         SaveExportDirectory(file);
         await ConfirmOpenExport(file);
     }
 
-    // Grava em plataforma com caminho real (desktop/Android) via File.*; no iOS (security-scoped) via stream.
-    private static async Task WriteExportFile(IStorageFile file, Action<Stream> writeStream, Action<string> writePath)
+    private static async Task<bool> ExportPdfBytes(IStorageFile file, Patient patient, IReadOnlyList<BloodPressureMeasurement> report, string description, bool truncated)
     {
-        var local = file.TryGetLocalPath();
-        if (!string.IsNullOrWhiteSpace(local) && !OperatingSystem.IsIOS())
-        {
-            try { writePath(local); return; }
-            catch { /* caminho não utilizável -> tenta o stream */ }
-        }
-        await using var s = await file.OpenWriteAsync();
-        writeStream(s);
+        using var ms = new MemoryStream();
+        PdfReportService.Export(ms, patient, report, description, truncated);
+        return await StorageWriter.Service.WriteAsync(file, ms.ToArray());
+    }
+
+    private static async Task<bool> ExportLetterBytes(IStorageFile file, Patient patient, IReadOnlyList<BloodPressureMeasurement> report, string description)
+    {
+        using var ms = new MemoryStream();
+        PdfReportService.ExportDoctorLetter(ms, patient, report, description);
+        return await StorageWriter.Service.WriteAsync(file, ms.ToArray());
     }
 
     // Pergunta se o usuário quer abrir o arquivo gerado com o aplicativo padrão do sistema
@@ -934,7 +934,7 @@ public class MainViewModel : ViewModelBase
     private void SaveExportDirectory(IStorageFile file)
     {
         var path = TryLocalPath(file);
-        var directory = Path.GetDirectoryName(path);
+        var directory = string.IsNullOrWhiteSpace(path) ? null : Path.GetDirectoryName(path);
         if (!string.IsNullOrWhiteSpace(directory)) _settingsRepository.SaveLastExportDirectory(directory);
     }
 
