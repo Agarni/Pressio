@@ -9,6 +9,7 @@
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
     <EmbeddedResource Include="Assets\Icon.png" LogicalName="Pressio.Assets.Icon.png" />
+    <EmbeddedResource Include="Assets\Fonts\Inter.ttf" LogicalName="Pressio.Assets.Fonts.Inter.ttf" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,5 +24,6 @@
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
     <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="PDFsharp" />
   </ItemGroup>
 </Project>

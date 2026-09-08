@@ -18,6 +18,7 @@
         <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.2" />
         <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.13" />
         <PackageVersion Include="SkiaSharp" Version="3.119.4" />
+        <PackageVersion Include="PDFsharp" Version="6.2.4" />
 
         <PackageVersion Include="Xamarin.AndroidX.Core.SplashScreen" Version="1.0.1.15" />
         <PackageVersion Include="Xamarin.AndroidX.Health.Connect.ConnectClient" Version="1.1.0.4" />

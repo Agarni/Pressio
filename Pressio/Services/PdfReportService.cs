@@ -2,75 +2,96 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Avalonia;
-using Avalonia.Platform;
-using SkiaSharp;
+using PdfSharp.Drawing;
+using PdfSharp.Fonts;
+using PdfSharp.Pdf;
 using Pressio.Models;
 
 namespace Pressio.Services;
 
+// Geração de PDF 100% gerenciada (PDFsharp), sem SkiaSharp nativo (que crasha no Android).
+// Fonte Inter embutida (SIL OFL) via IFontResolver.
 public static class PdfReportService
 {
     private const float PageW = 595f;
     private const float PageH = 842f;
     private const float Margin = 48f;
 
+    private static readonly XStringFormat BaseLine = new() { Alignment = XStringAlignment.Near, LineAlignment = XLineAlignment.BaseLine };
+    private static readonly XStringFormat Center = new() { Alignment = XStringAlignment.Center, LineAlignment = XLineAlignment.BaseLine };
+
+    private static readonly uint Primary = 0xFF3A3A9C;
+    private static readonly uint Text = 0xFF242B4A;
+    private static readonly uint Muted = 0xFF73799B;
+    private static readonly uint HeaderBg = 0xFFEEF0FF;
+    private static readonly uint ZebraBg = 0xFFF6F7FC;
+    private static readonly uint Line = 0xFFE0E3F1;
+    private static readonly uint Hi = 0xFFB42318;
+    private static readonly uint Sys = 0xFF5B5BD6;
+    private static readonly uint Dia = 0xFF8C93BE;
+    private static readonly uint White = 0xFFFFFFFF;
+
+    static PdfReportService()
+    {
+        GlobalFontSettings.FontResolver = new InterResolver();
+    }
+
     public static void Export(string path, Patient patient, IReadOnlyList<BloodPressureMeasurement> measurements, string description, bool truncated)
     {
-        using var stream = File.Create(path);
-        Export(stream, patient, measurements, description, truncated);
+        using var fs = File.Create(path);
+        Export(fs, patient, measurements, description, truncated);
     }
 
     public static void Export(Stream stream, Patient patient, IReadOnlyList<BloodPressureMeasurement> measurements, string description, bool truncated)
     {
         var total = CountPages(patient, measurements, description, truncated, letter: false);
-        using var document = SKDocument.CreatePdf(stream);
-        RenderReport(document, patient, measurements, description, truncated, total);
-        document.Close();
+        using var doc = new PdfDocument();
+        RenderReport(doc, patient, measurements, description, truncated, total);
+        doc.Save(stream);
     }
 
-    // Carta concisa para o médico: resumo clínico + faixas de referência + leituras relevantes.
     public static void ExportDoctorLetter(string path, Patient patient, IReadOnlyList<BloodPressureMeasurement> measurements, string description)
     {
-        using var stream = File.Create(path);
-        ExportDoctorLetter(stream, patient, measurements, description);
+        using var fs = File.Create(path);
+        ExportDoctorLetter(fs, patient, measurements, description);
     }
 
     public static void ExportDoctorLetter(Stream stream, Patient patient, IReadOnlyList<BloodPressureMeasurement> measurements, string description)
     {
         var total = CountPages(patient, measurements, description, truncated: false, letter: true);
-        using var document = SKDocument.CreatePdf(stream);
-        RenderLetter(document, patient, measurements, description, total);
-        document.Close();
+        using var doc = new PdfDocument();
+        RenderLetter(doc, patient, measurements, description, total);
+        doc.Save(stream);
     }
 
     private static int CountPages(Patient patient, IReadOnlyList<BloodPressureMeasurement> measurements, string description, bool truncated, bool letter)
     {
         using var ms = new MemoryStream();
-        using var doc = SKDocument.CreatePdf(ms);
+        using var doc = new PdfDocument();
         var pages = letter
             ? RenderLetter(doc, patient, measurements, description, totalPages: -1)
             : RenderReport(doc, patient, measurements, description, truncated, totalPages: -1);
-        doc.Close();
+        doc.Save(ms);
         return pages;
     }
 
-    private static int RenderReport(SKDocument document, Patient patient, IReadOnlyList<BloodPressureMeasurement> measurements, string description, bool truncated, int totalPages)
+    private static int RenderReport(PdfDocument doc, Patient patient, IReadOnlyList<BloodPressureMeasurement> measurements, string description, bool truncated, int totalPages)
     {
-        var titleFont = Font(SKFontStyleWeight.Bold, 20);
-        var sectionFont = Font(SKFontStyleWeight.Bold, 13);
-        var labelFont = Font(SKFontStyleWeight.SemiBold, 11);
-        var bodyFont = Font(SKFontStyleWeight.Normal, 11);
-        var smallFont = Font(SKFontStyleWeight.Normal, 9);
+        var titleFont = Font(XFontStyleEx.Bold, 20);
+        var sectionFont = Font(XFontStyleEx.Bold, 13);
+        var labelFont = Font(XFontStyleEx.Bold, 11);
+        var bodyFont = Font(XFontStyleEx.Regular, 11);
+        var smallFont = Font(XFontStyleEx.Regular, 9);
 
-        var primary = Paint(SKColor.Parse("#3A3A9C"));
-        var text = Paint(SKColor.Parse("#242B4A"));
-        var muted = Paint(SKColor.Parse("#73799B"));
-        var headerBg = Paint(SKColor.Parse("#EEF0FF"));
-        var zebraBg = Paint(SKColor.Parse("#F6F7FC"));
-        var line = new SKPaint { Color = SKColor.Parse("#E0E3F1"), Style = SKPaintStyle.Stroke, StrokeWidth = 1 };
-        var dashed = new SKPaint { Color = SKColor.Parse("#C6CCE6"), Style = SKPaintStyle.Stroke, StrokeWidth = 1, PathEffect = SKPathEffect.CreateDash(new float[] { 4, 4 }, 0) };
-        var hiPaint = Paint(SKColor.Parse("#B42318"));
+        var primary = Brush(Primary);
+        var text = Brush(Text);
+        var muted = Brush(Muted);
+        var headerBg = Brush(HeaderBg);
+        var zebraBg = Brush(ZebraBg);
+        var line = Pen(Line);
+        var dashed = Pen(0xFFC6CCE6);
+        dashed.DashStyle = XDashStyle.Dash;
+        var hiPaint = Brush(Hi);
 
         float width = PageW - Margin * 2;
         var cols = new (string Title, float W)[] {
@@ -78,199 +99,197 @@ public static class PdfReportService
         };
 
         var ordered = measurements.OrderBy(m => m.MeasuredAt).ToList();
-        var canvas = document.BeginPage(PageW, PageH);
-        var page = 1;
+        XGraphics? g = null;
+        var page = 0;
+        void NewPage() { g?.Dispose(); var p = doc.AddPage(); page++; g = XGraphics.FromPdfPage(p); }
+        NewPage();
         float y = Margin + 10;
 
-        DrawAppIcon(canvas);
-        canvas.DrawText("Pressio — Relatório de pressão", Margin + 58, y, titleFont, primary); y += 26;
-        canvas.DrawText($"Paciente: {patient.Name}", Margin + 58, y, labelFont, text); y += 18;
+        DrawAppIcon(g);
+        DrawText(g, "Pressio — Relatório de pressão", Margin + 58, y, titleFont, primary); y += 26;
+        DrawText(g, $"Paciente: {patient.Name}", Margin + 58, y, labelFont, text); y += 18;
         var note = $"Gerado em: {DateTime.Now:dd/MM/yyyy HH:mm}   •   {description}";
         if (truncated) note += "   •   exibindo os últimos 30 registros";
-        canvas.DrawText(note, Margin + 58, y, smallFont, muted); y += 16;
-        canvas.DrawLine(Margin, y, PageW - Margin, y, line); y += 24;
+        DrawText(g, note, Margin + 58, y, smallFont, muted); y += 16;
+        g.DrawLine(line, Margin, y, PageW - Margin, y); y += 24;
 
-        // Registros (primeira página)
-        canvas.DrawText("Registros", Margin, y, sectionFont, text); y += 20;
-        y = DrawTableHeader(canvas, cols, y, width, labelFont, text, headerBg);
+        DrawText(g, "Registros", Margin, y, sectionFont, text); y += 20;
+        y = DrawTableHeader(g, cols, y, width, labelFont, text, headerBg);
 
         for (var i = 0; i < ordered.Count; i++)
         {
             if (y > PageH - Margin - 12)
             {
-                DrawFooter(canvas, page, totalPages, patient.Name, smallFont, muted, line);
-                document.EndPage();
-                canvas = document.BeginPage(PageW, PageH); page++;
+                DrawFooter(g, page, totalPages, patient.Name, smallFont, muted, line);
+                NewPage();
                 y = Margin + 12;
-                y = DrawTableHeader(canvas, cols, y, width, labelFont, text, headerBg);
+                y = DrawTableHeader(g, cols, y, width, labelFont, text, headerBg);
             }
-            if (i % 2 == 1) canvas.DrawRect(Margin, y - 13, width, 16, zebraBg);
+            if (i % 2 == 1) g.DrawRectangle(zebraBg, Margin, y - 13, width, 16);
             float cx = Margin;
             var m = ordered[i];
-            DrawCell(canvas, m.DisplayDate, cols[0].W, ref cx, y, bodyFont, text);
-            DrawCell(canvas, m.DisplayValue, cols[1].W, ref cx, y, bodyFont, text);
-            DrawCell(canvas, m.HeartRate?.ToString() ?? "—", cols[2].W, ref cx, y, smallFont, muted);
-            DrawCell(canvas, DescribeMedication(m.MedicationTiming), cols[3].W, ref cx, y, smallFont, muted);
-            DrawCell(canvas, m.HasContext ? m.DisplayContext : "—", cols[4].W, ref cx, y, smallFont, muted);
-            DrawCell(canvas, string.IsNullOrWhiteSpace(m.Notes) ? "—" : m.Notes, cols[5].W, ref cx, y, smallFont, muted);
+            cx = DrawCell(g, m.DisplayDate, cols[0].W, cx, y, bodyFont, text);
+            cx = DrawCell(g, m.DisplayValue, cols[1].W, cx, y, bodyFont, text);
+            cx = DrawCell(g, m.HeartRate?.ToString() ?? "—", cols[2].W, cx, y, smallFont, muted);
+            cx = DrawCell(g, DescribeMedication(m.MedicationTiming), cols[3].W, cx, y, smallFont, muted);
+            cx = DrawCell(g, m.HasContext ? m.DisplayContext : "—", cols[4].W, cx, y, smallFont, muted);
+            cx = DrawCell(g, string.IsNullOrWhiteSpace(m.Notes) ? "—" : m.Notes, cols[5].W, cx, y, smallFont, muted);
             y += 16;
         }
 
-        // Resumo + estatísticas + gráfico (última página)
-        if (y > PageH - Margin - 260) { DrawFooter(canvas, page, totalPages, patient.Name, smallFont, muted, line); document.EndPage(); canvas = document.BeginPage(PageW, PageH); page++; y = Margin + 12; }
+        if (y > PageH - Margin - 260)
+        {
+            DrawFooter(g, page, totalPages, patient.Name, smallFont, muted, line);
+            NewPage(); y = Margin + 12;
+        }
         y += 16;
-        canvas.DrawText("Resumo", Margin, y, sectionFont, text); y += 22;
+        DrawText(g, "Resumo", Margin, y, sectionFont, text); y += 22;
         var avgSys = (int)Math.Round(measurements.Average(m => m.Systolic), MidpointRounding.AwayFromZero);
         var avgDia = (int)Math.Round(measurements.Average(m => m.Diastolic), MidpointRounding.AwayFromZero);
-        canvas.DrawText($"Média dos registros: {BloodPressureMeasurement.Format(avgSys, avgDia)} mmHg ({measurements.Count} registros)", Margin, y, bodyFont, text); y += 19;
-        y = DrawKv(canvas, "Antes da medicação", SummarizeByMedication(measurements, MedicationTiming.BeforeMedication), y, labelFont, bodyFont, text, muted);
-        y = DrawKv(canvas, "Depois da medicação", SummarizeByMedication(measurements, MedicationTiming.AfterMedication), y, labelFont, bodyFont, text, muted);
+        DrawText(g, $"Média dos registros: {BloodPressureMeasurement.Format(avgSys, avgDia)} mmHg ({measurements.Count} registros)", Margin, y, bodyFont, text); y += 19;
+        y = DrawKv(g, "Antes da medicação", SummarizeByMedication(measurements, MedicationTiming.BeforeMedication), y, labelFont, bodyFont, text, muted);
+        y = DrawKv(g, "Depois da medicação", SummarizeByMedication(measurements, MedicationTiming.AfterMedication), y, labelFont, bodyFont, text, muted);
 
         var minSys = ordered.Min(m => m.Systolic); var maxSys = ordered.Max(m => m.Systolic);
         var minDia = ordered.Min(m => m.Diastolic); var maxDia = ordered.Max(m => m.Diastolic);
-        y = DrawKv(canvas, "Máxima", $"{maxSys}/{maxDia} mmHg   •   Mínima: {minSys}/{minDia} mmHg", y, labelFont, bodyFont, text, muted);
+        y = DrawKv(g, "Máxima", $"{maxSys}/{maxDia} mmHg   •   Mínima: {minSys}/{minDia} mmHg", y, labelFont, bodyFont, text, muted);
 
         var highCount = ordered.Count(m => m.Systolic >= 140 || m.Diastolic >= 90);
         var highPct = measurements.Count == 0 ? 0 : (int)Math.Round(highCount * 100.0 / measurements.Count);
-        y = DrawKv(canvas, "≥ 140/90 (hipertensão)", $"{highCount} de {measurements.Count}  •  {highPct}%", y, labelFont, bodyFont, highCount > 0 ? hiPaint : text, muted);
+        y = DrawKv(g, "≥ 140/90 (hipertensão)", $"{highCount} de {measurements.Count}  •  {highPct}%", y, labelFont, bodyFont, highCount > 0 ? hiPaint : text, muted);
 
         var hr = measurements.Where(m => m.HeartRate is not null).ToList();
         var hrText = hr.Count == 0 ? "—" : $"{(int)Math.Round(hr.Average(m => m.HeartRate!.Value))} bpm (média de {hr.Count})";
-        y = DrawKv(canvas, "Frequência cardíaca", hrText, y, labelFont, bodyFont, text, muted);
+        y = DrawKv(g, "Frequência cardíaca", hrText, y, labelFont, bodyFont, text, muted);
 
-        // Distribuição por faixa
         y += 6;
-        canvas.DrawText("Distribuição por faixa", Margin, y, sectionFont, text); y += 20;
+        DrawText(g, "Distribuição por faixa", Margin, y, sectionFont, text); y += 20;
         float bx = Margin;
         foreach (PressureCategory cat in Enum.GetValues<PressureCategory>())
         {
             var count = ordered.Count(m => m.Category == cat);
             if (count == 0) continue;
             var chipW = 104f;
-            var catPaint = Paint(SKColor.Parse(BloodPressureClassification.Color(cat)));
-            canvas.DrawRoundRect(bx, y - 12, chipW, 18, 5, 5, catPaint);
-            canvas.DrawText($"{BloodPressureClassification.Label(cat)}: {count}", bx + 6, y, labelFont, Paint(SKColor.Parse("#FFFFFF")));
+            var catBrush = Brush(ParseColor(BloodPressureClassification.Color(cat)));
+            DrawRounded(g, catBrush, bx, y - 12, chipW, 18, 5);
+            DrawText(g, $"{BloodPressureClassification.Label(cat)}: {count}", bx + 6, y, labelFont, Brush(White));
             bx += chipW + 6;
             if (bx + chipW > PageW - Margin) { bx = Margin; y += 20; }
         }
         y += 24;
 
         if (ordered.Count > 1)
-            y = DrawChart(canvas, ordered, y + 6, smallFont, labelFont, text, muted, dashed);
+            y = DrawChart(g, ordered, y + 6, smallFont, text, muted, dashed);
 
-        DrawFooter(canvas, page, totalPages, patient.Name, smallFont, muted, line);
-        document.EndPage();
+        DrawFooter(g, page, totalPages, patient.Name, smallFont, muted, line);
+        g?.Dispose();
         return page;
     }
 
-    private static int RenderLetter(SKDocument document, Patient patient, IReadOnlyList<BloodPressureMeasurement> measurements, string description, int totalPages)
+    private static int RenderLetter(PdfDocument doc, Patient patient, IReadOnlyList<BloodPressureMeasurement> measurements, string description, int totalPages)
     {
-        var titleFont = Font(SKFontStyleWeight.Bold, 20);
-        var sectionFont = Font(SKFontStyleWeight.Bold, 13);
-        var labelFont = Font(SKFontStyleWeight.SemiBold, 11);
-        var bodyFont = Font(SKFontStyleWeight.Normal, 11);
-        var smallFont = Font(SKFontStyleWeight.Normal, 9);
+        var titleFont = Font(XFontStyleEx.Bold, 20);
+        var sectionFont = Font(XFontStyleEx.Bold, 13);
+        var labelFont = Font(XFontStyleEx.Bold, 11);
+        var bodyFont = Font(XFontStyleEx.Regular, 11);
+        var smallFont = Font(XFontStyleEx.Regular, 9);
 
-        var primary = Paint(SKColor.Parse("#3A3A9C"));
-        var text = Paint(SKColor.Parse("#242B4A"));
-        var muted = Paint(SKColor.Parse("#73799B"));
-        var headerBg = Paint(SKColor.Parse("#EEF0FF"));
-        var zebraBg = Paint(SKColor.Parse("#F6F7FC"));
-        var line = new SKPaint { Color = SKColor.Parse("#E0E3F1"), Style = SKPaintStyle.Stroke, StrokeWidth = 1 };
+        var primary = Brush(Primary);
+        var text = Brush(Text);
+        var muted = Brush(Muted);
+        var headerBg = Brush(HeaderBg);
+        var zebraBg = Brush(ZebraBg);
+        var line = Pen(Line);
 
         float width = PageW - Margin * 2;
         var ordered = measurements.OrderBy(m => m.MeasuredAt).ToList();
-        var canvas = document.BeginPage(PageW, PageH);
-        var page = 1;
+        XGraphics? g = null;
+        var page = 0;
+        void NewPage() { g?.Dispose(); var p = doc.AddPage(); page++; g = XGraphics.FromPdfPage(p); }
+        NewPage();
         float y = Margin + 10;
 
-        DrawAppIcon(canvas);
-        canvas.DrawText("Pressio — Carta ao médico", Margin + 58, y, titleFont, primary); y += 26;
-        canvas.DrawText($"Paciente: {patient.Name}", Margin + 58, y, labelFont, text); y += 18;
-        canvas.DrawText($"Gerado em: {DateTime.Now:dd/MM/yyyy HH:mm}   •   {description}", Margin + 58, y, smallFont, muted); y += 16;
-        canvas.DrawLine(Margin, y, PageW - Margin, y, line); y += 22;
+        DrawAppIcon(g);
+        DrawText(g, "Pressio — Carta ao médico", Margin + 58, y, titleFont, primary); y += 26;
+        DrawText(g, $"Paciente: {patient.Name}", Margin + 58, y, labelFont, text); y += 18;
+        DrawText(g, $"Gerado em: {DateTime.Now:dd/MM/yyyy HH:mm}   •   {description}", Margin + 58, y, smallFont, muted); y += 16;
+        g.DrawLine(line, Margin, y, PageW - Margin, y); y += 22;
 
-        canvas.DrawText("Prezado(a) Dr(a).,", Margin, y, bodyFont, text); y += 20;
-        y = WrapText(canvas,
-            $"Segue o acompanhamento da pressão arterial de {patient.Name.Split(' ')[0]}, " +
-            $"com {measurements.Count} registro(s) no período. Abaixo está o resumo dos valores e as leituras mais relevantes para sua avaliação.",
-            Margin, y, width, bodyFont, text, 15); y += 12;
+        DrawText(g, "Prezado(a) Dr(a).,", Margin, y, bodyFont, text); y += 20;
+        y = WrapText(g, $"Segue o acompanhamento da pressão arterial de {patient.Name.Split(' ')[0]}, com {measurements.Count} registro(s) no período. Abaixo está o resumo dos valores e as leituras mais relevantes para sua avaliação.", Margin, y, width, bodyFont, text, 15); y += 12;
 
-        // Resumo clínico
-        canvas.DrawText("1. Resumo clínico", Margin, y, sectionFont, text); y += 20;
+        DrawText(g, "1. Resumo clínico", Margin, y, sectionFont, text); y += 20;
         var avgSys = (int)Math.Round(measurements.Average(m => m.Systolic), MidpointRounding.AwayFromZero);
         var avgDia = (int)Math.Round(measurements.Average(m => m.Diastolic), MidpointRounding.AwayFromZero);
         var avgCat = BloodPressureClassification.Classify(avgSys, avgDia);
-        y = DrawKv(canvas, "Média geral", $"{BloodPressureMeasurement.Format(avgSys, avgDia)} mmHg  •  {BloodPressureClassification.Label(avgCat)}", y, labelFont, bodyFont, text, muted);
+        y = DrawKv(g, "Média geral", $"{BloodPressureMeasurement.Format(avgSys, avgDia)} mmHg  •  {BloodPressureClassification.Label(avgCat)}", y, labelFont, bodyFont, text, muted);
 
         var last = ordered[^1];
-        y = DrawKv(canvas, "Última aferição", $"{last.DisplayValue} mmHg  •  {last.DisplayDate}  •  {last.CategoryLabel}", y, labelFont, bodyFont, text, muted);
-        y = DrawKv(canvas, "Antes da medicação", SummarizeByMedication(measurements, MedicationTiming.BeforeMedication), y, labelFont, bodyFont, text, muted);
-        y = DrawKv(canvas, "Depois da medicação", SummarizeByMedication(measurements, MedicationTiming.AfterMedication), y, labelFont, bodyFont, text, muted);
-        y = DrawKv(canvas, "Por horário", TimeOfDaySummary(ordered), y, labelFont, bodyFont, text, muted);
+        y = DrawKv(g, "Última aferição", $"{last.DisplayValue} mmHg  •  {last.DisplayDate}  •  {last.CategoryLabel}", y, labelFont, bodyFont, text, muted);
+        y = DrawKv(g, "Antes da medicação", SummarizeByMedication(measurements, MedicationTiming.BeforeMedication), y, labelFont, bodyFont, text, muted);
+        y = DrawKv(g, "Depois da medicação", SummarizeByMedication(measurements, MedicationTiming.AfterMedication), y, labelFont, bodyFont, text, muted);
+        y = DrawKv(g, "Por horário", TimeOfDaySummary(ordered), y, labelFont, bodyFont, text, muted);
 
-        // Distribuição por faixa
         y += 8;
-        canvas.DrawText("2. Distribuição por faixa", Margin, y, sectionFont, text); y += 20;
+        DrawText(g, "2. Distribuição por faixa", Margin, y, sectionFont, text); y += 20;
         float bx = Margin;
         foreach (PressureCategory cat in Enum.GetValues<PressureCategory>())
         {
             var count = ordered.Count(m => m.Category == cat);
             if (count == 0) continue;
             var chipW = 104f;
-            var catPaint = Paint(SKColor.Parse(BloodPressureClassification.Color(cat)));
-            canvas.DrawRoundRect(bx, y - 12, chipW, 18, 5, 5, catPaint);
-            canvas.DrawText($"{BloodPressureClassification.Label(cat)}: {count}", bx + 6, y, labelFont, Paint(SKColor.Parse("#FFFFFF")));
+            DrawRounded(g, Brush(ParseColor(BloodPressureClassification.Color(cat))), bx, y - 12, chipW, 18, 5);
+            DrawText(g, $"{BloodPressureClassification.Label(cat)}: {count}", bx + 6, y, labelFont, Brush(White));
             bx += chipW + 6;
             if (bx + chipW > PageW - Margin) { bx = Margin; y += 20; }
         }
         y += 22;
 
-        // Faixas de referência (legenda)
-        canvas.DrawText("3. Faixas de referência (7ª Diretriz Brasileira de Hipertensão)", Margin, y, sectionFont, text); y += 20;
-        y = DrawRangesLegend(canvas, y, width, labelFont, bodyFont, smallFont, text, muted, headerBg);
+        DrawText(g, "3. Faixas de referência (7ª Diretriz Brasileira de Hipertensão)", Margin, y, sectionFont, text); y += 20;
+        y = DrawRangesLegend(g, y, width, labelFont, bodyFont, text, muted, headerBg);
 
-        // Nova página para as leituras relevantes
-        if (y > PageH - Margin - 60) { DrawFooter(canvas, page, totalPages, patient.Name, smallFont, muted, line); document.EndPage(); canvas = document.BeginPage(PageW, PageH); page++; y = Margin + 12; }
+        if (y > PageH - Margin - 60)
+        {
+            DrawFooter(g, page, totalPages, patient.Name, smallFont, muted, line);
+            NewPage(); y = Margin + 12;
+        }
         else y += 6;
-        canvas.DrawText("4. Leituras mais relevantes", Margin, y, sectionFont, text); y += 20;
+        DrawText(g, "4. Leituras mais relevantes", Margin, y, sectionFont, text); y += 20;
 
         var relevant = BuildRelevantReadings(ordered);
         var cols = new (string Title, float W)[] {
             ("Data e hora", 100f), ("Pressão", 58f), ("FC", 34f), ("Classificação", 118f), ("Medicação", 72f), ("Observação", width - 100f - 58f - 34f - 118f - 72f)
         };
-        y = DrawTableHeader(canvas, cols, y, width, labelFont, text, headerBg);
+        y = DrawTableHeader(g, cols, y, width, labelFont, text, headerBg);
         for (var i = 0; i < relevant.Count; i++)
         {
             if (y > PageH - Margin - 14)
             {
-                DrawFooter(canvas, page, totalPages, patient.Name, smallFont, muted, line);
-                document.EndPage();
-                canvas = document.BeginPage(PageW, PageH); page++;
-                y = Margin + 12;
-                y = DrawTableHeader(canvas, cols, y, width, labelFont, text, headerBg);
+                DrawFooter(g, page, totalPages, patient.Name, smallFont, muted, line);
+                NewPage(); y = Margin + 12;
+                y = DrawTableHeader(g, cols, y, width, labelFont, text, headerBg);
             }
-            if (i % 2 == 1) canvas.DrawRect(Margin, y - 13, width, 16, zebraBg);
+            if (i % 2 == 1) g.DrawRectangle(zebraBg, Margin, y - 13, width, 16);
             float cx = Margin;
             var m = relevant[i];
-            DrawCell(canvas, m.DisplayDate, cols[0].W, ref cx, y, bodyFont, text);
-            DrawCell(canvas, m.DisplayValue, cols[1].W, ref cx, y, bodyFont, text);
-            DrawCell(canvas, m.HeartRate?.ToString() ?? "—", cols[2].W, ref cx, y, smallFont, muted);
-            var catPaint = Paint(SKColor.Parse(BloodPressureClassification.Color(m.Category)));
-            canvas.Save();
-            canvas.ClipRect(new SKRect(cx, y - 13, cx + cols[3].W, y + 4));
-            var pillW = Math.Min(smallFont.MeasureText(m.CategoryLabel) + 14f, cols[3].W - 8f);
-            canvas.DrawRoundRect(cx + 4, y - 10, pillW, 14, 4, 4, catPaint);
-            canvas.DrawText(m.CategoryLabel, cx + 11, y, smallFont, Paint(SKColor.Parse("#FFFFFF")));
-            canvas.Restore();
+            cx = DrawCell(g, m.DisplayDate, cols[0].W, cx, y, bodyFont, text);
+            cx = DrawCell(g, m.DisplayValue, cols[1].W, cx, y, bodyFont, text);
+            cx = DrawCell(g, m.HeartRate?.ToString() ?? "—", cols[2].W, cx, y, smallFont, muted);
+            var catBrush = Brush(ParseColor(BloodPressureClassification.Color(m.Category)));
+            g.Save();
+            g.IntersectClip(new XRect(cx, y - 13, cols[3].W, 17));
+            var pillW = Math.Min(Measure(g, m.CategoryLabel, smallFont) + 14f, cols[3].W - 8f);
+            DrawRounded(g, catBrush, cx + 4, y - 10, pillW, 14, 4);
+            DrawText(g, m.CategoryLabel, cx + 11, y, smallFont, Brush(White));
+            g.Restore();
             cx += cols[3].W;
-            DrawCell(canvas, DescribeMedication(m.MedicationTiming), cols[4].W, ref cx, y, smallFont, muted);
-            DrawCell(canvas, string.IsNullOrWhiteSpace(m.Notes) ? "—" : m.Notes, cols[5].W, ref cx, y, smallFont, muted);
+            cx = DrawCell(g, DescribeMedication(m.MedicationTiming), cols[4].W, cx, y, smallFont, muted);
+            cx = DrawCell(g, string.IsNullOrWhiteSpace(m.Notes) ? "—" : m.Notes, cols[5].W, cx, y, smallFont, muted);
             y += 16;
         }
 
-        DrawFooter(canvas, page, totalPages, patient.Name, smallFont, muted, line);
-        document.EndPage();
+        DrawFooter(g, page, totalPages, patient.Name, smallFont, muted, line);
+        g?.Dispose();
         return page;
     }
 
@@ -303,7 +322,7 @@ public static class PdfReportService
         return parts.Count == 0 ? "—" : string.Join("   |   ", parts);
     }
 
-    private static float DrawRangesLegend(SKCanvas canvas, float y, float width, SKFont labelFont, SKFont bodyFont, SKFont smallFont, SKPaint text, SKPaint muted, SKPaint headerBg)
+    private static float DrawRangesLegend(XGraphics g, float y, float width, XFont labelFont, XFont bodyFont, XBrush text, XBrush muted, XBrush headerBg)
     {
         var rows = new (string Range, string Category, string Color)[] {
             ("< 120 e < 80", "Ótima", BloodPressureClassification.Color(PressureCategory.Optimal)),
@@ -313,72 +332,70 @@ public static class PdfReportService
             ("160–179 ou 100–109", "Hipertensão 2", BloodPressureClassification.Color(PressureCategory.Stage2)),
             ("≥ 180 ou ≥ 110", "Hipertensão 3", BloodPressureClassification.Color(PressureCategory.Stage3)),
         };
-        canvas.DrawRect(Margin, y - 14, width, 17, headerBg);
-        canvas.DrawText("Pressão (mmHg)", Margin + 6, y, labelFont, text);
-        canvas.DrawText("Classificação", Margin + 180, y, labelFont, text);
+        g.DrawRectangle(headerBg, Margin, y - 14, width, 17);
+        DrawText(g, "Pressão (mmHg)", Margin + 6, y, labelFont, text);
+        DrawText(g, "Classificação", Margin + 180, y, labelFont, text);
         y += 14;
         foreach (var r in rows)
         {
-            canvas.DrawText(r.Range, Margin + 6, y, bodyFont, muted);
-            canvas.DrawRoundRect(Margin + 178, y - 10, 12, 12, 3, 3, Paint(SKColor.Parse(r.Color)));
-            canvas.DrawText(r.Category, Margin + 196, y, bodyFont, text);
+            DrawText(g, r.Range, Margin + 6, y, bodyFont, muted);
+            DrawRounded(g, Brush(ParseColor(r.Color)), Margin + 178, y - 10, 12, 12, 3);
+            DrawText(g, r.Category, Margin + 196, y, bodyFont, text);
             y += 17;
         }
         return y;
     }
 
-    private static float WrapText(SKCanvas canvas, string text, float x, float y, float maxWidth, SKFont font, SKPaint paint, float lineHeight)
+    private static float WrapText(XGraphics g, string text, float x, float y, float maxWidth, XFont font, XBrush brush, float lineHeight)
     {
         var words = text.Split(' ');
         var lineStr = "";
         foreach (var w in words)
         {
             var test = lineStr.Length == 0 ? w : lineStr + " " + w;
-            if (font.MeasureText(test) > maxWidth && lineStr.Length > 0)
+            if (Measure(g, test, font) > maxWidth && lineStr.Length > 0)
             {
-                canvas.DrawText(lineStr, x, y, font, paint);
+                DrawText(g, lineStr, x, y, font, brush);
                 y += lineHeight;
                 lineStr = w;
             }
             else lineStr = test;
         }
-        if (lineStr.Length > 0) { canvas.DrawText(lineStr, x, y, font, paint); y += lineHeight; }
+        if (lineStr.Length > 0) { DrawText(g, lineStr, x, y, font, brush); y += lineHeight; }
         return y;
     }
 
-    private static float DrawTableHeader(SKCanvas canvas, (string Title, float W)[] cols, float y, float width, SKFont labelFont, SKPaint text, SKPaint headerBg)
+    private static float DrawTableHeader(XGraphics g, (string Title, float W)[] cols, float y, float width, XFont labelFont, XBrush text, XBrush headerBg)
     {
         float cx = Margin;
-        canvas.DrawRect(Margin, y - 14, width, 17, headerBg);
-        foreach (var c in cols) { canvas.DrawText(c.Title, cx + 6, y, labelFont, text); cx += c.W; }
+        g.DrawRectangle(headerBg, Margin, y - 14, width, 17);
+        foreach (var c in cols) { DrawText(g, c.Title, cx + 6, y, labelFont, text); cx += c.W; }
         return y + 14;
     }
 
-    private static void DrawFooter(SKCanvas canvas, int page, int totalPages, string patientName, SKFont font, SKPaint muted, SKPaint line)
+    private static void DrawFooter(XGraphics g, int page, int totalPages, string patientName, XFont font, XBrush muted, XPen line)
     {
+        if (g is null) return;
         var y = PageH - Margin + 14;
-        canvas.DrawLine(Margin, PageH - Margin, PageW - Margin, PageH - Margin, line);
+        g.DrawLine(line, Margin, PageH - Margin, PageW - Margin, PageH - Margin);
         var left = $"Paciente: {(patientName ?? "").Split(' ')[0]}";
-        canvas.DrawText(left, Margin, y, font, muted);
+        DrawText(g, left, Margin, y, font, muted);
         var pageText = totalPages > 0 ? $"Página {page} de {totalPages}" : $"Página {page}";
-        var cw = font.MeasureText(pageText);
-        canvas.DrawText(pageText, (PageW - cw) / 2, y, font, muted);
-        var right = "Pressio";
-        canvas.DrawText(right, PageW - Margin - font.MeasureText(right), y, font, muted);
+        var cw = Measure(g, pageText, font);
+        DrawText(g, pageText, (PageW - cw) / 2, y, font, muted);
+        DrawText(g, "Pressio", PageW - Margin - Measure(g, "Pressio", font), y, font, muted);
     }
 
-    private static void DrawAppIcon(SKCanvas canvas)
+    private static void DrawAppIcon(XGraphics g)
     {
         try
         {
-            using var stream = typeof(PdfReportService).Assembly.GetManifestResourceStream("Pressio.Assets.Icon.png");
-            using var bitmap = SKBitmap.Decode(stream);
-            if (bitmap != null) canvas.DrawBitmap(bitmap, new SKRect(Margin, Margin - 6, Margin + 42, Margin + 36));
+            using var s = typeof(PdfReportService).Assembly.GetManifestResourceStream("Pressio.Assets.Icon.png");
+            if (s is null) return;
+            using var img = XImage.FromStream(s);
+            g.DrawImage(img, Margin, Margin - 6, 42, 42);
         }
-        catch
-        {
-            // gráfico não é essencial; segue sem ícone se o asset não estiver disponível
-        }
+        catch { /* ícone não essencial */ }
     }
 
     private static string SummarizeByMedication(IReadOnlyList<BloodPressureMeasurement> items, MedicationTiming timing)
@@ -398,97 +415,94 @@ public static class PdfReportService
         _ => "Não informado"
     };
 
-    private static float DrawKv(SKCanvas canvas, string label, string value, float y, SKFont labelFont, SKFont bodyFont, SKPaint text, SKPaint muted)
+    private static float DrawKv(XGraphics g, string label, string value, float y, XFont labelFont, XFont bodyFont, XBrush text, XBrush muted)
     {
-        canvas.DrawText(label, Margin + 8, y, labelFont, muted);
-        canvas.DrawText(value, Margin + 132, y, bodyFont, text);
+        DrawText(g, label, Margin + 8, y, labelFont, muted);
+        DrawText(g, value, Margin + 132, y, bodyFont, text);
         return y + 19;
     }
 
-    private static float DrawChart(SKCanvas canvas, IReadOnlyList<BloodPressureMeasurement> ordered, float y, SKFont smallFont, SKFont labelFont, SKPaint text, SKPaint muted, SKPaint dashed)
+    private static float DrawChart(XGraphics g, IReadOnlyList<BloodPressureMeasurement> ordered, float y, XFont smallFont, XBrush text, XBrush muted, XPen dashed)
     {
         float left = Margin, width = PageW - Margin * 2, chartH = 120;
         float axisY = y + 6;
         float bottom = axisY + chartH + 6;
         float valueTop = axisY - 4;
 
-        // Escala do eixo Y (mmHg) com valores de referência.
         var min = ordered.Min(m => Math.Min(m.Systolic, m.Diastolic));
         var max = Math.Max(min + 1, ordered.Max(m => Math.Max(m.Systolic, m.Diastolic)));
         float Y(int v) => axisY + (max - v) * chartH / (max - min);
         float X(int i) => ordered.Count == 1 ? left + width / 2 : left + i * width / (ordered.Count - 1);
 
-        // Eixo Y + rótulo.
-        canvas.DrawText("mmHg", left - 4, axisY - 4, smallFont, muted);
-        canvas.DrawLine(left, axisY, left, bottom, muted);
-        canvas.DrawText(min.ToString(), left - 4, bottom, smallFont, muted);
-        canvas.DrawText(max.ToString(), left - 4, valueTop, smallFont, muted);
+        DrawText(g, "mmHg", left - 4, axisY - 4, smallFont, muted);
+        g.DrawLine(Pen(Muted), left, axisY, left, bottom);
+        DrawText(g, min.ToString(), left - 4, bottom, smallFont, muted);
+        DrawText(g, max.ToString(), left - 4, valueTop, smallFont, muted);
 
-        // Linhas-guia de referência (140 sistólica / 90 diastólica).
         var refSysY = Y(140);
         var refDiaY = Y(90);
-        if (refSysY > axisY && refSysY < bottom)
-        {
-            canvas.DrawLine(left, refSysY, left + width, refSysY, dashed);
-            canvas.DrawText("140", left + width - 22, refSysY - 3, smallFont, muted);
-        }
-        if (refDiaY > axisY && refDiaY < bottom)
-        {
-            canvas.DrawLine(left, refDiaY, left + width, refDiaY, dashed);
-            canvas.DrawText("90", left + width - 18, refDiaY - 3, smallFont, muted);
-        }
+        if (refSysY > axisY && refSysY < bottom) { g.DrawLine(dashed, left, refSysY, left + width, refSysY); DrawText(g, "140", left + width - 22, refSysY - 3, smallFont, muted); }
+        if (refDiaY > axisY && refDiaY < bottom) { g.DrawLine(dashed, left, refDiaY, left + width, refDiaY); DrawText(g, "90", left + width - 18, refDiaY - 3, smallFont, muted); }
 
-        // Linhas de cada paciente.
-        var sysPoints = ordered.Select((m, i) => new SKPoint(X(i), Y(m.Systolic))).ToList();
-        var diaPoints = ordered.Select((m, i) => new SKPoint(X(i), Y(m.Diastolic))).ToList();
-        var sysPaint = new SKPaint { Color = SKColor.Parse("#5B5BD6"), Style = SKPaintStyle.Stroke, StrokeWidth = 2.5f, IsAntialias = true };
-        var diaPaint = new SKPaint { Color = SKColor.Parse("#8C93BE"), Style = SKPaintStyle.Stroke, StrokeWidth = 1.8f, IsAntialias = true };
-        using var sysPath = new SKPath();
-        using var diaPath = new SKPath();
-        BuildSmoothPath(sysPath, sysPoints);
-        BuildSmoothPath(diaPath, diaPoints);
-        canvas.DrawPath(sysPath, sysPaint);
-        canvas.DrawPath(diaPath, diaPaint);
+        var sysPoints = ordered.Select((m, i) => new XPoint(X(i), Y(m.Systolic))).ToArray();
+        var diaPoints = ordered.Select((m, i) => new XPoint(X(i), Y(m.Diastolic))).ToArray();
+        g.DrawCurve(new XPen(XColor.FromArgb(unchecked((int)Sys)), 2.5), sysPoints);
+        g.DrawCurve(new XPen(XColor.FromArgb(unchecked((int)Dia)), 1.8), diaPoints);
 
-        var valuePaint = Paint(SKColor.Parse("#242B4A"));
         for (var i = 0; i < ordered.Count; i++)
-            canvas.DrawText(ordered[i].Systolic.ToString(), Math.Max(left, X(i) - 16), Y(ordered[i].Systolic) - 4, smallFont, valuePaint);
+            DrawText(g, ordered[i].Systolic.ToString(), Math.Max(left, X(i) - 16), Y(ordered[i].Systolic) - 4, smallFont, Brush(Text));
 
-        canvas.DrawText("Sistólica (linha cheia) e diastólica (linha clara). Tracejado: referências 140/90 mmHg.", left, bottom + 18, smallFont, muted);
+        DrawText(g, "Sistólica (linha cheia) e diastólica (linha clara). Tracejado: referências 140/90 mmHg.", left, bottom + 18, smallFont, muted);
         return bottom + 40;
     }
 
-    private static void BuildSmoothPath(SKPath path, IReadOnlyList<SKPoint> pts)
+    private static float DrawCell(XGraphics g, string value, float width, float cellX, float y, XFont font, XBrush brush)
     {
-        if (pts.Count == 0) return;
-        path.MoveTo(pts[0]);
-        if (pts.Count == 1) return;
-        for (var i = 0; i < pts.Count - 1; i++)
+        g.Save();
+        g.IntersectClip(new XRect(cellX, y - 13, width, 17));
+        DrawText(g, value, cellX + 6, y, font, brush);
+        g.Restore();
+        return cellX + width;
+    }
+
+    private static void DrawRounded(XGraphics g, XBrush brush, float x, float y, float w, float h, float r)
+        => g.DrawRoundedRectangle(null, brush, x, y, w, h, r, r);
+
+    private static void DrawText(XGraphics g, string value, float x, float y, XFont font, XBrush brush)
+        => g.DrawString(value, font, brush, new XRect(x, y, 0, 0), BaseLine);
+
+    private static float Measure(XGraphics g, string value, XFont font)
+        => (float)g.MeasureString(value, font).Width;
+
+    private static XFont Font(XFontStyleEx style, float size) => new("Inter", size, style);
+
+    private static XBrush Brush(uint argb) => new XSolidBrush(XColor.FromArgb(unchecked((int)argb)));
+
+    private static XPen Pen(uint argb, float width = 1) => new(XColor.FromArgb(unchecked((int)argb)), width);
+
+    private static uint ParseColor(string hex)
+    {
+        var h = hex.TrimStart('#');
+        var r = Convert.ToByte(h.Substring(0, 2), 16);
+        var gc = Convert.ToByte(h.Substring(2, 2), 16);
+        var b = Convert.ToByte(h.Substring(4, 2), 16);
+        return (uint)(0xFF000000 | (r << 16) | (gc << 8) | b);
+    }
+
+    private sealed class InterResolver : IFontResolver
+    {
+        private readonly byte[] _font = Load();
+
+        private static byte[] Load()
         {
-            var p0 = pts[Math.Max(0, i - 1)];
-            var p1 = pts[i];
-            var p2 = pts[i + 1];
-            var p3 = pts[Math.Min(pts.Count - 1, i + 2)];
-            var c1 = new SKPoint(p1.X + (p2.X - p0.X) / 6f, p1.Y + (p2.Y - p0.Y) / 6f);
-            var c2 = new SKPoint(p2.X - (p3.X - p1.X) / 6f, p2.Y - (p3.Y - p1.Y) / 6f);
-            path.CubicTo(c1, c2, p2);
+            using var s = typeof(PdfReportService).Assembly.GetManifestResourceStream("Pressio.Assets.Fonts.Inter.ttf");
+            using var ms = new MemoryStream();
+            s?.CopyTo(ms);
+            return ms.ToArray();
         }
-    }
 
-    private static void DrawCell(SKCanvas canvas, string value, float width, ref float cellX, float y, SKFont font, SKPaint paint)
-    {
-        canvas.Save();
-        canvas.ClipRect(new SKRect(cellX, y - 13, cellX + width, y + 4));
-        canvas.DrawText(value, cellX + 6, y, font, paint);
-        canvas.Restore();
-        cellX += width;
-    }
+        public byte[] GetFont(string faceName) => _font;
 
-    private static SKFont Font(SKFontStyleWeight weight, float size)
-    {
-        var style = new SKFontStyle(weight, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright);
-        return new SKFont(SKTypeface.FromFamilyName("Helvetica", style), size);
+        public FontResolverInfo ResolveTypeface(string familyName, bool isBold, bool isItalic) => new(familyName);
     }
-
-    private static SKPaint Paint(SKColor color) => new() { Color = color, IsAntialias = true };
 }
