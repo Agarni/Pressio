@@ -261,6 +261,7 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> ExportPdfCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ExportLetterCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> SendToHealthCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> ShowReportOptionsCommand { get; private set; } = null!;
     public bool IsHealthExportAvailable => HealthExport.Service.IsSupported;
     public ReactiveCommand<Unit, Unit> BackupCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> RestoreCommand { get; private set; } = null!;
@@ -390,6 +391,7 @@ public class MainViewModel : ViewModelBase
         ExportPdfCommand = ReactiveCommand.CreateFromTask(ExportPdf);
         ExportLetterCommand = ReactiveCommand.CreateFromTask(ExportLetter);
         SendToHealthCommand = ReactiveCommand.CreateFromTask(SendToHealth);
+        ShowReportOptionsCommand = ReactiveCommand.CreateFromTask(ShowReportOptions);
         BackupCommand = ReactiveCommand.CreateFromTask(Backup);
         RestoreCommand = ReactiveCommand.CreateFromTask(Restore);
         LoadAppSettings();
@@ -794,6 +796,21 @@ public class MainViewModel : ViewModelBase
         var last = _settingsRepository.GetLastPatientId();
         SelectedPatient = last != 0 && Patients.FirstOrDefault(p => p.Id == last) is { } p ? p : Patients.FirstOrDefault();
         if (IsProfileListVisible) RefreshProfileList();
+    }
+
+    private async Task ShowReportOptions()
+    {
+        if (SelectedPatient is null || Measurements.Count == 0) { Notify("Não há medições para exportar."); return; }
+        var options = new List<string> { "Carta ao médico", "Exportar PDF", "Exportar CSV" };
+        if (IsHealthExportAvailable) options.Add("Enviar para Saúde");
+        var choice = await Dialog.ShowOptionsAsync("Relatório do usuário", options, "Fechar");
+        switch (choice)
+        {
+            case "Carta ao médico": await ExportLetter(); break;
+            case "Exportar PDF": await ExportPdf(); break;
+            case "Exportar CSV": await ExportCsv(); break;
+            case "Enviar para Saúde": await SendToHealth(); break;
+        }
     }
 
     private async Task SendToHealth()
