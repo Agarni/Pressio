@@ -263,6 +263,8 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> SendToHealthCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ShowReportOptionsCommand { get; private set; } = null!;
     public bool IsHealthExportAvailable => HealthExport.Service.IsSupported;
+    // SkiaSharp PDF crasha (SIGSEGV) no Android; CSV (grava bytes) funciona.
+    public bool IsPdfExportAvailable => !OperatingSystem.IsAndroid();
     public ReactiveCommand<Unit, Unit> BackupCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> RestoreCommand { get; private set; } = null!;
     public Interaction<ExportFileRequest, IStorageFile?> ExportFileInteraction { get; } = new();
@@ -801,7 +803,9 @@ public class MainViewModel : ViewModelBase
     private async Task ShowReportOptions()
     {
         if (SelectedPatient is null || Measurements.Count == 0) { Notify("Não há medições para exportar."); return; }
-        var options = new List<string> { "Carta ao médico", "Exportar PDF", "Exportar CSV" };
+        var options = new List<string>();
+        if (IsPdfExportAvailable) { options.Add("Carta ao médico"); options.Add("Exportar PDF"); }
+        options.Add("Exportar CSV");
         var healthLabel = $"Enviar {SelectedPatient!.Name} para o Saúde";
         if (IsHealthExportAvailable) options.Add(healthLabel);
         var choice = await Dialog.ShowOptionsAsync("Relatório do usuário", options, "Fechar");
@@ -854,6 +858,7 @@ public class MainViewModel : ViewModelBase
     private async Task ExportPdf()
     {
         if (SelectedPatient is null || Measurements.Count == 0) { Notify("Não há medições para exportar."); return; }
+        if (!IsPdfExportAvailable) { Notify("Exportação em PDF não está disponível neste aparelho. Use a opção de CSV.", "Exportar PDF"); return; }
         var (report, truncated) = BuildReportSet();
         if (report.Count == 0) { Notify("Não há medições no período selecionado."); return; }
         var file = await RequestExportPath("pdf", "PDF");
@@ -872,6 +877,7 @@ public class MainViewModel : ViewModelBase
     private async Task ExportLetter()
     {
         if (SelectedPatient is null || Measurements.Count == 0) { Notify("Não há medições para exportar."); return; }
+        if (!IsPdfExportAvailable) { Notify("A carta ao médico não está disponível neste aparelho. Use a opção de CSV.", "Carta ao médico"); return; }
         var (report, truncated) = BuildReportSet();
         if (report.Count == 0) { Notify("Não há medições no período selecionado."); return; }
         var file = await RequestExportPath("pdf", "PDF da carta");
