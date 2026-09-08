@@ -17,6 +17,7 @@ namespace Pressio.Android
         protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)
         {
             Notifications.Service = new AndroidNotificationService(this);
+            HealthExport.Service = new AndroidHealthExportService();
             return base.CustomizeAppBuilder(builder)
             .WithInterFont()
             .UseReactiveUI();

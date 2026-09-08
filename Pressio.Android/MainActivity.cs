@@ -1,4 +1,8 @@
-﻿using Android.App;
+﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Android.App;
+using Android.Content;
 using Android.Content.PM;
 using Android.OS;
 using AndroidX.Activity;
@@ -17,13 +21,46 @@ namespace Pressio.Android;
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
 public class MainActivity : AvaloniaMainActivity
 {
+    private const int HealthPermissionRequest = 4357;
+    private static TaskCompletionSource<bool>? _healthPermTcs;
+    private static MainActivity? _current;
+
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        _current = this;
         OnBackPressedDispatcher.AddCallback(this, new BackCallback(OnBackPressedDispatcher));
     }
 
-    // Fecha a tela/popup atual com o botão voltar; se não houver o que fechar, segue o padrão (sai do app).
+    public static Task<bool> RequestHealthPermissionAsync()
+    {
+        var activity = _current;
+        if (activity is null) return Task.FromResult(false);
+        var tcs = new TaskCompletionSource<bool>();
+        _healthPermTcs = tcs;
+        var intent = new Intent();
+        intent.SetClassName(activity, "androidx.health.connect.client.PermissionActivity");
+        intent.PutStringArrayListExtra("androidx.health.connect.client.extra.REQUESTED_PERMISSIONS", new List<string>
+        {
+            "android.permission.health.READ_BLOOD_PRESSURE",
+            "android.permission.health.WRITE_BLOOD_PRESSURE",
+            "android.permission.health.READ_HEART_RATE",
+            "android.permission.health.WRITE_HEART_RATE",
+        });
+        activity.StartActivityForResult(intent, HealthPermissionRequest);
+        return tcs.Task;
+    }
+
+    protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+    {
+        base.OnActivityResult(requestCode, resultCode, data);
+        if (requestCode == HealthPermissionRequest)
+        {
+            _healthPermTcs?.TrySetResult(resultCode == Result.Ok);
+            _healthPermTcs = null;
+        }
+    }
+
     private sealed class BackCallback : OnBackPressedCallback
     {
         private readonly OnBackPressedDispatcher _dispatcher;
