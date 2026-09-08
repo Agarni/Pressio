@@ -6,13 +6,13 @@ using Pressio.Services;
 
 namespace Pressio.Android;
 
-// Scaffold da integração com o Health Connect (sucessor do Google Fit, sem conta).
-// O fluxo real (gravação) exige o app Health Connect instalado + a API de corrotinas do binding; ver TODO.
+// Scaffold da integração com o Health Connect. A gravação usa corrotinas (IContinuation) + construção
+// de Metadata do binding 1.1.0.4, que precisa ser validada no device. Mantido como stub (desligado)
+// para não exibir um botão quebrado.
 public sealed class AndroidHealthExportService : IHealthExportService
 {
     private const int Unavailable = 1;
 
-    // Desligado por enquanto (a gravação depende do app Health Connect + bridge de corrotinas).
     public bool IsSupported => false;
 
     public async Task<bool> RequestAuthorizationAsync()
