@@ -1172,8 +1172,13 @@ public class MainViewModel : ViewModelBase
                     ChartLabels.Add(new ChartPointLabel(labelText, lx, ly));
                     var pointY = i % 2 == 0 ? Y(chartData[i].Systolic) : Y(chartData[i].Diastolic);
                     var anchorY = i % 2 == 0 ? ly + 12 : ly - 5;
-                    ctx.BeginFigure(new Point(lx + labelW / 2, anchorY), false);
-                    ctx.LineTo(new Point(X(i), pointY));
+                    // Limita ao retângulo do gráfico para nenhuma linha-guia sair da área.
+                    var lx1 = Math.Clamp(lx + labelW / 2, 2, 498);
+                    var ly1 = Math.Clamp(anchorY, 2, 148);
+                    var lx2 = Math.Clamp(X(i), 2, 498);
+                    var ly2 = Math.Clamp(pointY, 2, 148);
+                    ctx.BeginFigure(new Point(lx1, ly1), false);
+                    ctx.LineTo(new Point(lx2, ly2));
                     ChartMarkers.Add(new ChartPointMarker((int)X(i), (int)Y(chartData[i].Systolic), chartData[i].Category));
                     ChartMarkers.Add(new ChartPointMarker((int)X(i), (int)Y(chartData[i].Diastolic), chartData[i].Category));
                 }
