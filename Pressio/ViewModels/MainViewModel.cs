@@ -260,6 +260,8 @@ public class MainViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> SaveMeasurementCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> DeleteMeasurementCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> EditMeasurementCommand { get; private set; } = null!;
+    public ReactiveCommand<BloodPressureMeasurement, Unit> EditCardMeasurementCommand { get; private set; } = null!;
+    public ReactiveCommand<BloodPressureMeasurement, Unit> DeleteCardMeasurementCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ShowPatientFormCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ShowProfileListCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ExportCsvCommand { get; private set; } = null!;
@@ -321,6 +323,8 @@ public class MainViewModel : ViewModelBase
         });
         SaveMeasurementCommand = ReactiveCommand.Create(SaveMeasurement);
         DeleteMeasurementCommand = ReactiveCommand.Create(DeleteSelectedMeasurement);
+        EditCardMeasurementCommand = ReactiveCommand.Create<BloodPressureMeasurement>(m => { SelectedMeasurement = m; EditSelectedMeasurement(); });
+        DeleteCardMeasurementCommand = ReactiveCommand.Create<BloodPressureMeasurement>(m => { SelectedMeasurement = m; DeleteSelectedMeasurement(); });
         MeasurementForm.SaveRequested += SaveMeasurement;
         MeasurementForm.CancelRequested += () => { IsMeasurementFormVisible = false; };
         EditMeasurementCommand = ReactiveCommand.Create(EditSelectedMeasurement);
