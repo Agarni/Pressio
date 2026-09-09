@@ -18,6 +18,9 @@ public partial class AppDelegate : AvaloniaAppDelegate<App>
 {
     protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)
     {
+        // Sincroniza na nuvem antes de o app ir para segundo plano (tempo limitado — melhor esforço).
+        NSNotificationCenter.DefaultCenter.AddObserver(UIApplication.DidEnterBackgroundNotification,
+            n => { _ = App.Main?.SyncNowFromHost(); });
         return base.CustomizeAppBuilder(builder)
             .WithInterFont()
             .UseReactiveUI();

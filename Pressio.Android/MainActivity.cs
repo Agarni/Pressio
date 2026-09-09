@@ -44,6 +44,13 @@ public class MainActivity : AvaloniaMainActivity
         base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
+    protected override void OnStop()
+    {
+        base.OnStop();
+        // Ao entrar em segundo plano, envia as alterações recentes para a nuvem.
+        _ = App.Main?.SyncNowFromHost();
+    }
+
     public static Task<bool> RequestHealthPermissionAsync()
     {
         var activity = _current;

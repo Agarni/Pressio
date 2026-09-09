@@ -145,7 +145,12 @@ public class MainViewModel : ViewModelBase
             this.RaisePropertyChanged(nameof(PatientName)); this.RaisePropertyChanged(nameof(Initials));
         }
     }
-    public BloodPressureMeasurement? SelectedMeasurement { get => _selectedMeasurement; set => this.RaiseAndSetIfChanged(ref _selectedMeasurement, value); }
+    public BloodPressureMeasurement? SelectedMeasurement
+    {
+        get => _selectedMeasurement;
+        set { _selectedMeasurement = value; this.RaisePropertyChanged(); this.RaisePropertyChanged(nameof(HasSelectedMeasurement)); }
+    }
+    public bool HasSelectedMeasurement => SelectedMeasurement is not null;
     public bool IsPatientFormVisible
     {
         get => _isPatientFormVisible;
@@ -298,11 +303,11 @@ public class MainViewModel : ViewModelBase
             MeasurementForm.Notes = string.Empty;
             MeasurementForm.MeasurementDate = DateTime.Today;
             MeasurementForm.MeasurementTime = DateTime.Now.TimeOfDay;
-            MeasurementForm.MedicationTiming = MedicationTiming.NotInformed;
+            MeasurementForm.MedicationTiming = MedicationTiming.BeforeMedication;
             MeasurementForm.HeartRateInput = string.Empty;
             MeasurementForm.AtRest = false;
-            MeasurementForm.SelectedArm = "Não informado";
-            MeasurementForm.SelectedPosition = "Não informado";
+            MeasurementForm.SelectedArm = "Esquerdo";
+            MeasurementForm.SelectedPosition = "Sentado";
             MeasurementForm.SetContext(MeasurementContext.None);
             MeasurementForm.MeasurementError = string.Empty;
             IsMeasurementFormVisible = true;
@@ -472,6 +477,14 @@ public class MainViewModel : ViewModelBase
     {
         if (!_supabase.IsAuthenticated) { SetSyncError("Entre com sua conta (Configurações → Sincronização) para sincronizar na nuvem."); return; }
         _ = SyncCloudAsync(SyncMode.Manual);
+    }
+
+    // Chamado pelos hosts ao fechar (desktop) ou entrar em suspensão (mobile): garante que as
+    // alterações recentes cheguem à nuvem antes de o processo sair/pausar.
+    public Task SyncNowFromHost()
+    {
+        if (!_supabase.IsAuthenticated) return Task.CompletedTask;
+        return SyncCloudAsync(SyncMode.Manual);
     }
 
     private void SetSyncBanner(string text, bool isError)

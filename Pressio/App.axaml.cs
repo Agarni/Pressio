@@ -6,6 +6,7 @@ using Avalonia.Media;
 using Avalonia.Styling;
 using Pressio.ViewModels;
 using Pressio.Views;
+using System.Threading.Tasks;
 
 namespace Pressio;
 
@@ -57,6 +58,7 @@ public partial class App : Application
             {
                 DataContext = Main
             };
+            _ = SyncOnCloseAsync(desktop);
         }
         else if (ApplicationLifetime is IActivityApplicationLifetime singleViewFactoryApplicationLifetime)
         {
@@ -73,5 +75,23 @@ public partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    // Sincroniza na nuvem ao fechar a janela (desktop) antes de o processo sair.
+    private async Task SyncOnCloseAsync(IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        if (desktop.MainWindow is not { } window) return;
+        var syncing = false;
+        window.Closing += async (_, e) =>
+        {
+            if (Main is null || syncing) return;
+            syncing = true;
+            e.Cancel = true;
+            try { await Main.SyncNowFromHost(); }
+            catch { }
+            window.Close();
+            syncing = false;
+        };
+        await Task.CompletedTask;
     }
 }
