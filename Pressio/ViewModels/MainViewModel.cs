@@ -1169,7 +1169,8 @@ public class MainViewModel : ViewModelBase
             var index = Reminders.IndexOf(selected);
             Reminders[index] = new ReminderItem(updated, PersistReminderEnabled);
             SelectedReminder = Reminders[index];
-            _ = Notifications.Service.ScheduleAsync(updated);
+            if (updated.Enabled) _ = Notifications.Service.ScheduleAsync(updated);
+            else _ = Notifications.Service.CancelAsync(updated.Id);
         }
         else
         {
@@ -1178,7 +1179,7 @@ public class MainViewModel : ViewModelBase
             var item = new ReminderItem(reminder, PersistReminderEnabled);
             Reminders.Add(item);
             SelectedReminder = item;
-            _ = Notifications.Service.ScheduleAsync(reminder);
+            if (reminder.Enabled) _ = Notifications.Service.ScheduleAsync(reminder);
         }
         IsReminderFormVisible = false;
     }
