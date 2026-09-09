@@ -529,7 +529,7 @@ public class MainViewModel : ViewModelBase
             }
             _settingsRepository.SaveAuthSession(_supabase.SerializeSession());
             var remote = await _supabase.FetchSnapshotAsync();
-            var mergedJson = ApplyRemoteSync(remote, showMessage: isManual);
+            var mergedJson = ApplyRemoteSync(remote, showMessage: false);
             await _supabase.SaveSnapshotAsync(mergedJson);
             _lastUploadedSnapshot = mergedJson;
             _syncService.CompactTombstones();
