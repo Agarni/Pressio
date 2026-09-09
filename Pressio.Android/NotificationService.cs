@@ -53,10 +53,17 @@ public sealed class AndroidNotificationService : INotificationService
         var builder = Build.VERSION.SdkInt >= BuildVersionCodes.O
             ? new Notification.Builder(_context, ChannelId)
             : new Notification.Builder(_context);
+
+        // Abre o app ao tocar na notificação.
+        var launch = new Intent(_context, typeof(MainActivity));
+        launch.SetFlags(ActivityFlags.SingleTop | ActivityFlags.ClearTop);
+        var contentIntent = PendingIntent.GetActivity(_context, id, launch, PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
+
         builder.SetContentTitle(title)
             .SetContentText(message)
             .SetSmallIcon(Resource.Drawable.Icon)
-            .SetAutoCancel(true);
+            .SetAutoCancel(true)
+            .SetContentIntent(contentIntent);
         _manager.Notify(id, builder.Build());
     }
 
