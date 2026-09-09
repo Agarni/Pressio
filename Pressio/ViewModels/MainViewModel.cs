@@ -514,7 +514,8 @@ public class MainViewModel : ViewModelBase
             if (!_supabase.IsAuthenticated)
             {
                 var msg = "Sessão inválida. Faça login novamente.";
-                if (isManual) SetSyncError(msg); else { SetSyncBanner(msg, isError: true); FinishStartupSplash(); }
+                if (isManual) SetSyncError(msg);
+                else if (isStartup) { SetSyncBanner(msg, isError: true); FinishStartupSplash(); }
                 return;
             }
             // Garante um access token válido (renova se o anterior expirou).
@@ -522,7 +523,8 @@ public class MainViewModel : ViewModelBase
             if (!refreshed.Success)
             {
                 var msg = "Sessão expirada. Faça login novamente.";
-                if (isManual) SetSyncError(msg); else { SetSyncBanner(msg, isError: true); FinishStartupSplash(); }
+                if (isManual) SetSyncError(msg);
+                else if (isStartup) { SetSyncBanner(msg, isError: true); FinishStartupSplash(); }
                 return;
             }
             _settingsRepository.SaveAuthSession(_supabase.SerializeSession());
@@ -537,9 +539,20 @@ public class MainViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            var msg = "Falha ao sincronizar: " + ex.Message;
-            if (isManual) ShowMessage(msg);
-            else { SetSyncBanner(msg, isError: true); FinishStartupSplash(); }
+            // Falha de rede/transitória (ex.: aparelho bloqueado, offline) é silenciosa no automático;
+            // o sync periódico re-tenta sozinho. Só o manual mostra o erro ao usuário.
+            var isNetwork = ex is System.Net.Http.HttpRequestException
+                || ex is System.IO.IOException
+                || ex is OperationCanceledException
+                || ex is System.Net.Sockets.SocketException
+                || ex is System.Net.WebException;
+            if (isManual)
+                ShowMessage("Falha ao sincronizar: " + ex.Message);
+            else if (isStartup)
+            {
+                FinishStartupSplash();
+                if (!isNetwork) SetSyncBanner("Falha ao sincronizar: " + ex.Message, isError: true);
+            }
         }
         finally
         {
