@@ -54,6 +54,7 @@ public class MainViewModel : ViewModelBase
     public Geometry DiastolicLine { get => _diastolicLine; private set => this.RaiseAndSetIfChanged(ref _diastolicLine, value); }
     public ObservableCollection<ChartPointLabel> ChartLabels { get; } = new();
     public ObservableCollection<ChartPointMarker> ChartMarkers { get; } = new();
+    public ObservableCollection<ChartLeaderLine> ChartLeaderLines { get; } = new();
     public string BeforeMedicationSummary { get; private set; } = "—";
     public string AfterMedicationSummary { get; private set; } = "—";
     public IReadOnlyList<TimeSlotInfo> TimeDistribution { get; private set; } = Array.Empty<TimeSlotInfo>();
@@ -1144,6 +1145,7 @@ public class MainViewModel : ViewModelBase
             DiastolicLine = new StreamGeometry();
             ChartLabels.Clear();
             ChartMarkers.Clear();
+            ChartLeaderLines.Clear();
         }
         else
         {
@@ -1157,6 +1159,7 @@ public class MainViewModel : ViewModelBase
             DiastolicLine = ChartPathBuilder.BuildSmooth(diastolic);
             ChartLabels.Clear();
             ChartMarkers.Clear();
+            ChartLeaderLines.Clear();
             for (var i = 0; i < chartData.Count; i++)
             {
                 var labelText = BloodPressureMeasurement.Format(chartData[i].Systolic, chartData[i].Diastolic);
@@ -1168,6 +1171,10 @@ public class MainViewModel : ViewModelBase
                     ? (int)Math.Clamp(Y(chartData[i].Systolic) - 26, 4, 134)
                     : (int)Math.Clamp(Y(chartData[i].Diastolic) + 12, 4, 140);
                 ChartLabels.Add(new ChartPointLabel(labelText, lx, ly));
+                // Linha-guia tracejada ligando a etiqueta ao ponto da mesma aferição.
+                var pointY = i % 2 == 0 ? Y(chartData[i].Systolic) : Y(chartData[i].Diastolic);
+                var anchorY = i % 2 == 0 ? ly + 10 : ly - 6;
+                ChartLeaderLines.Add(new ChartLeaderLine(new Point(lx + labelW / 2, anchorY), new Point(X(i), pointY)));
                 ChartMarkers.Add(new ChartPointMarker((int)X(i), (int)Y(chartData[i].Systolic), chartData[i].Category));
                 ChartMarkers.Add(new ChartPointMarker((int)X(i), (int)Y(chartData[i].Diastolic), chartData[i].Category));
             }

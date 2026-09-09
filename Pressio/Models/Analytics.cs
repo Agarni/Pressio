@@ -21,4 +21,7 @@ public sealed record ChartPointMarker(int X, int Y, PressureCategory Category)
     public Thickness Offset => new(X - 4, Y - 4, 0, 0);
 }
 
+// Linha-guia tracejada ligando a etiqueta de valor ao ponto correspondente (mesma aferição).
+public sealed record ChartLeaderLine(Point Start, Point End);
+
 public sealed record ExportFileRequest(string FileName, string Extension, string Kind, string? StartDirectory);
