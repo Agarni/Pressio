@@ -25,10 +25,16 @@ public sealed class AndroidNotificationService : INotificationService
     {
         var alarm = (AlarmManager)_context.GetSystemService(Context.AlarmService)!;
         var trigger = NextTrigger(reminder).ToUnixTimeMilliseconds();
-        if (Build.VERSION.SdkInt >= BuildVersionCodes.M)
-            alarm.SetAndAllowWhileIdle(AlarmType.RtcWakeup, trigger, BuildPendingIntent(reminder));
+        var pi = BuildPendingIntent(reminder);
+
+        // Alarme EXATO para disparar no horário (o setAndAllowWhileIdle pode adiar em ~1h).
+        if (Build.VERSION.SdkInt >= BuildVersionCodes.S)
+            alarm.SetExactAndAllowWhileIdle(AlarmType.RtcWakeup, trigger, pi);
+        else if (Build.VERSION.SdkInt >= BuildVersionCodes.M)
+            alarm.SetExactAndAllowWhileIdle(AlarmType.RtcWakeup, trigger, pi);
         else
-            alarm.Set(AlarmType.RtcWakeup, trigger, BuildPendingIntent(reminder));
+            alarm.SetExact(AlarmType.RtcWakeup, trigger, pi);
+
         return Task.CompletedTask;
     }
 
