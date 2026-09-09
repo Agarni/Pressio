@@ -22,6 +22,7 @@ namespace Pressio.Android;
 public class MainActivity : AvaloniaMainActivity
 {
     private const int HealthPermissionRequest = 4357;
+    private const int NotificationPermissionRequest = 4358;
     private static TaskCompletionSource<bool>? _healthPermTcs;
     private static MainActivity? _current;
 
@@ -30,6 +31,17 @@ public class MainActivity : AvaloniaMainActivity
         base.OnCreate(savedInstanceState);
         _current = this;
         OnBackPressedDispatcher.AddCallback(this, new BackCallback(OnBackPressedDispatcher));
+        // Android 13+ exige permissão de notificação em runtime; sem ela a notificação é bloqueada.
+        if (Build.VERSION.SdkInt >= BuildVersionCodes.Tiramisu &&
+            CheckSelfPermission("android.permission.POST_NOTIFICATIONS") != Permission.Granted)
+        {
+            RequestPermissions(new[] { "android.permission.POST_NOTIFICATIONS" }, NotificationPermissionRequest);
+        }
+    }
+
+    public override void OnRequestPermissionsResult(int requestCode, string[] permissions, Permission[] grantResults)
+    {
+        base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
     public static Task<bool> RequestHealthPermissionAsync()
