@@ -37,7 +37,8 @@ public sealed record BloodPressureMeasurement(
     bool AtRest = false,
     Arm Arm = Arm.NotInformed,
     BodyPosition Position = BodyPosition.NotInformed,
-    long Id = 0)
+    long Id = 0,
+    string? MedicationName = null)
 {
     public static bool UseShorthandFormat { get; set; } = true;
 

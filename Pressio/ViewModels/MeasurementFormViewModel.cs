@@ -139,6 +139,17 @@ public sealed class MeasurementFormViewModel : ViewModelBase
     private string _selectedPosition = "Não informado";
     public string SelectedPosition { get => _selectedPosition; set => this.RaiseAndSetIfChanged(ref _selectedPosition, value); }
 
+    public ObservableCollection<string> MedicationNames { get; } = new();
+    public void SetMedicationOptions(IReadOnlyList<string> meds)
+    {
+        MedicationNames.Clear();
+        MedicationNames.Add("—");
+        foreach (var m in meds) if (!string.IsNullOrWhiteSpace(m)) MedicationNames.Add(m);
+        if (!MedicationNames.Contains(SelectedMedicationName)) SelectedMedicationName = "—";
+    }
+    private string _selectedMedicationName = "—";
+    public string SelectedMedicationName { get => _selectedMedicationName; set { if (_selectedMedicationName != value) { _selectedMedicationName = value; this.RaisePropertyChanged(nameof(SelectedMedicationName)); MeasurementError = string.Empty; } } }
+
     public MeasurementContext SelectedContext()
     {
         var result = MeasurementContext.None;

@@ -107,7 +107,7 @@ public static class PdfReportService
 
         DrawAppIcon(g);
         DrawText(g, "Pressio — Relatório de pressão", Margin + 58, y, titleFont, primary); y += 26;
-        DrawText(g, $"Paciente: {patient.Name}", Margin + 58, y, labelFont, text); y += 18;
+        DrawText(g, $"Paciente: {PatientFullName(patient)}", Margin + 58, y, labelFont, text); y += 18;
         var note = $"Gerado em: {DateTime.Now:dd/MM/yyyy HH:mm}   •   {description}";
         if (truncated) note += "   •   exibindo os últimos 30 registros";
         DrawText(g, note, Margin + 58, y, smallFont, muted); y += 16;
@@ -211,12 +211,20 @@ public static class PdfReportService
 
         DrawAppIcon(g);
         DrawText(g, "Pressio — Carta ao médico", Margin + 58, y, titleFont, primary); y += 26;
-        DrawText(g, $"Paciente: {patient.Name}", Margin + 58, y, labelFont, text); y += 18;
+        DrawText(g, $"Paciente: {PatientFullName(patient)}", Margin + 58, y, labelFont, text); y += 18;
         DrawText(g, $"Gerado em: {DateTime.Now:dd/MM/yyyy HH:mm}   •   {description}", Margin + 58, y, smallFont, muted); y += 16;
         g.DrawLine(line, Margin, y, PageW - Margin, y); y += 22;
 
-        DrawText(g, "Prezado(a) Dr(a).,", Margin, y, bodyFont, text); y += 20;
-        y = WrapText(g, $"Segue o acompanhamento da pressão arterial de {patient.Name.Split(' ')[0]}, com {measurements.Count} registro(s) no período. Abaixo está o resumo dos valores e as leituras mais relevantes para sua avaliação.", Margin, y, width, bodyFont, text, 15); y += 12;
+        DrawText(g, string.IsNullOrWhiteSpace(patient.DoctorName) ? "Prezado(a) Dr(a).," : $"Prezado(a) Dr(a). {patient.DoctorName},", Margin, y, bodyFont, text); y += 20;
+        y = WrapText(g, $"Segue o acompanhamento da pressão arterial de {FirstName(patient)}, com {measurements.Count} registro(s) no período. Abaixo está o resumo dos valores e as leituras mais relevantes para sua avaliação.", Margin, y, width, bodyFont, text, 15); y += 12;
+
+        if (!string.IsNullOrWhiteSpace(patient.HealthDetails) || !string.IsNullOrWhiteSpace(patient.Medications) || !string.IsNullOrWhiteSpace(patient.DoctorName))
+        {
+            DrawText(g, "Dados do usuário", Margin, y, sectionFont, text); y += 18;
+            if (!string.IsNullOrWhiteSpace(patient.Medications)) y = DrawKv(g, "Medicações em uso", patient.Medications.Replace(';', ','), y, labelFont, bodyFont, text, muted);
+            if (!string.IsNullOrWhiteSpace(patient.HealthDetails)) y = DrawKv(g, "Dados de saúde", patient.HealthDetails, y, labelFont, bodyFont, text, muted);
+            y += 4;
+        }
 
         DrawText(g, "1. Resumo clínico", Margin, y, sectionFont, text); y += 20;
         var avgSys = (int)Math.Round(measurements.Average(m => m.Systolic), MidpointRounding.AwayFromZero);
@@ -292,6 +300,12 @@ public static class PdfReportService
         g?.Dispose();
         return page;
     }
+
+    private static string PatientFullName(Patient p)
+        => string.IsNullOrWhiteSpace(p.FullName) ? p.Name : p.FullName;
+
+    private static string FirstName(Patient p)
+        => PatientFullName(p).Split(' ')[0];
 
     private static IReadOnlyList<BloodPressureMeasurement> BuildRelevantReadings(IReadOnlyList<BloodPressureMeasurement> ordered)
     {

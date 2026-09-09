@@ -311,6 +311,8 @@ public class MainViewModel : ViewModelBase
             MeasurementForm.SelectedArm = "Esquerdo";
             MeasurementForm.SelectedPosition = "Sentado";
             MeasurementForm.SetContext(MeasurementContext.None);
+            MeasurementForm.SelectedMedicationName = "—";
+            MeasurementForm.SetMedicationOptions(MedicationListOf(SelectedPatient));
             MeasurementForm.MeasurementError = string.Empty;
             IsMeasurementFormVisible = true;
             MeasurementForm.NotifyShown();
@@ -700,7 +702,8 @@ public class MainViewModel : ViewModelBase
             heartRate = hr;
         }
         var context = MeasurementForm.SelectedContext();
-        var measurement = new BloodPressureMeasurement(parsed!.Systolic, parsed.Diastolic, measuredAt, MeasurementForm.MedicationTiming, string.IsNullOrWhiteSpace(MeasurementForm.Notes) ? null : MeasurementForm.Notes.Trim(), context, heartRate, MeasurementForm.AtRest, MeasurementForm.ParseArm(), MeasurementForm.ParsePosition());
+        var medicationName = MeasurementForm.SelectedMedicationName == "—" ? null : MeasurementForm.SelectedMedicationName?.Trim();
+        var measurement = new BloodPressureMeasurement(parsed!.Systolic, parsed.Diastolic, measuredAt, MeasurementForm.MedicationTiming, string.IsNullOrWhiteSpace(MeasurementForm.Notes) ? null : MeasurementForm.Notes.Trim(), context, heartRate, MeasurementForm.AtRest, MeasurementForm.ParseArm(), MeasurementForm.ParsePosition(), 0, medicationName);
         if (_editingMeasurement && SelectedMeasurement is { Id: > 0 } existing)
         {
             measurement = measurement with { Id = existing.Id };
@@ -735,20 +738,24 @@ public class MainViewModel : ViewModelBase
     {
         if (string.IsNullOrWhiteSpace(PatientForm.NewPatientName)) { var msg = "Informe o nome do usuário."; PatientForm.PatientError = msg; Notify(msg, "Nome obrigatório"); return; }
         var name = PatientForm.NewPatientName.Trim();
+        var fullName = string.IsNullOrWhiteSpace(PatientForm.FullName) ? null : PatientForm.FullName.Trim();
+        var medications = string.IsNullOrWhiteSpace(PatientForm.MedicationsJoined) ? null : PatientForm.MedicationsJoined;
+        var healthDetails = string.IsNullOrWhiteSpace(PatientForm.HealthDetails) ? null : PatientForm.HealthDetails.Trim();
+        var doctorName = string.IsNullOrWhiteSpace(PatientForm.DoctorName) ? null : PatientForm.DoctorName.Trim();
         if (PatientForm.IsEditMode && _editingPatientId is { } pid)
         {
             var index = -1;
             for (var i = 0; i < Patients.Count; i++) if (Patients[i].Id == pid) { index = i; break; }
             if (index < 0) { IsPatientFormVisible = false; return; }
-            var updated = Patients[index] with { Name = name };
+            var updated = Patients[index] with { Name = name, FullName = fullName, Medications = medications, HealthDetails = healthDetails, DoctorName = doctorName };
             _measurementRepository.UpdatePatient(updated);
             Patients[index] = updated;
             if (SelectedPatient?.Id == pid) SelectedPatient = updated;
         }
         else
         {
-            var id = _measurementRepository.AddPatient(name, null, null);
-            var patient = new Patient(id, name);
+            var id = _measurementRepository.AddPatient(name, null, null, fullName, medications, healthDetails, doctorName);
+            var patient = new Patient(id, name, null, null, fullName, medications, healthDetails, doctorName);
             Patients.Add(patient);
             SelectedPatient = patient;
         }
@@ -958,6 +965,11 @@ public class MainViewModel : ViewModelBase
     private static string TryLocalPath(IStorageFile file)
         => file.TryGetLocalPath() ?? file.Path.LocalPath;
 
+    private static string[] MedicationListOf(Patient? patient)
+        => string.IsNullOrWhiteSpace(patient?.Medications)
+            ? Array.Empty<string>()
+            : patient!.Medications!.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
     private void ClosePatientForm()
     {
         IsPatientFormVisible = false;
@@ -975,8 +987,7 @@ public class MainViewModel : ViewModelBase
         _returnToProfileList = true;
         IsProfileListVisible = false;
         PatientForm.IsEditMode = false;
-        PatientForm.NewPatientName = string.Empty;
-        PatientForm.PatientError = string.Empty;
+        PatientForm.Reset();
         IsPatientFormVisible = true;
         PatientForm.NotifyShown();
     }
@@ -1011,6 +1022,10 @@ public class MainViewModel : ViewModelBase
         IsProfileListVisible = false;
         PatientForm.IsEditMode = true;
         PatientForm.NewPatientName = item.Patient.Name;
+        PatientForm.FullName = item.Patient.FullName ?? string.Empty;
+        PatientForm.HealthDetails = item.Patient.HealthDetails ?? string.Empty;
+        PatientForm.DoctorName = item.Patient.DoctorName ?? string.Empty;
+        PatientForm.SetMedications(item.Patient.Medications);
         PatientForm.PatientError = string.Empty;
         IsPatientFormVisible = true;
         PatientForm.NotifyShown();
@@ -1077,6 +1092,8 @@ public class MainViewModel : ViewModelBase
         MeasurementForm.AtRest = measurement.AtRest;
         MeasurementForm.SelectedArm = measurement.Arm switch { Arm.Right => "Direito", Arm.Left => "Esquerdo", _ => "Não informado" };
         MeasurementForm.SelectedPosition = measurement.Position switch { BodyPosition.Seated => "Sentado", BodyPosition.Lying => "Deitado", BodyPosition.Standing => "Em pé", _ => "Não informado" };
+        MeasurementForm.SetMedicationOptions(MedicationListOf(SelectedPatient));
+        MeasurementForm.SelectedMedicationName = string.IsNullOrWhiteSpace(measurement.MedicationName) ? "—" : measurement.MedicationName;
         MeasurementForm.SetContext(measurement.Context);
         MeasurementForm.MeasurementError = string.Empty;
         IsMeasurementFormVisible = true;

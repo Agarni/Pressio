@@ -21,6 +21,10 @@ public sealed class SyncPatient
     public string Name { get; set; } = string.Empty;
     public DateTime? BirthDate { get; set; }
     public string? Notes { get; set; }
+    public string? FullName { get; set; }
+    public string? Medications { get; set; }
+    public string? HealthDetails { get; set; }
+    public string? DoctorName { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public bool Deleted { get; set; }
     public string DeviceId { get; set; } = string.Empty;
@@ -40,6 +44,7 @@ public sealed class SyncMeasurement
     public bool AtRest { get; set; }
     public Arm Arm { get; set; }
     public BodyPosition Position { get; set; }
+    public string? MedicationName { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public bool Deleted { get; set; }
     public string DeviceId { get; set; } = string.Empty;

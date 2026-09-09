@@ -13,6 +13,20 @@
         <TextBlock Text="Crie ou atualize o perfil que terá suas próprias medições." FontSize="{Binding IsMobileLayout, Converter={StaticResource Mob}, ConverterParameter=13;1.8}" Foreground="{DynamicResource PressioMutedBrush}" TextWrapping="Wrap" />
         <TextBox x:Name="PatientNameInput" Text="{Binding NewPatientName}" PlaceholderText="Nome do usuário" FontSize="{Binding IsMobileLayout, Converter={StaticResource Mob}, ConverterParameter=14;1.2}" />
         <TextBlock Text="{Binding PatientError}" FontSize="{Binding IsMobileLayout, Converter={StaticResource Mob}, ConverterParameter=12;1.8}" Foreground="#B42318" TextWrapping="Wrap" />
+        <TextBox Text="{Binding FullName}" PlaceholderText="Nome completo (opcional, exibido na carta ao médico)" FontSize="{Binding IsMobileLayout, Converter={StaticResource Mob}, ConverterParameter=14;1.2}" />
+        <TextBox Text="{Binding DoctorName}" PlaceholderText="Médico que acompanha (opcional)" FontSize="{Binding IsMobileLayout, Converter={StaticResource Mob}, ConverterParameter=14;1.2}" />
+        <TextBox Text="{Binding HealthDetails}" PlaceholderText="Dados de saúde (opcional, ex.: alergias, condições, cirurgias)" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" FontSize="{Binding IsMobileLayout, Converter={StaticResource Mob}, ConverterParameter=14;1.2}" />
+        <StackPanel Spacing="6">
+          <TextBlock Text="Medicações em uso (opcional)" FontSize="{Binding IsMobileLayout, Converter={StaticResource Mob}, ConverterParameter=12;1.8}" FontWeight="SemiBold" />
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <TextBox Text="{Binding NewMedicationText}" PlaceholderText="Ex.: Losartana, Atenolol..." FontSize="{Binding IsMobileLayout, Converter={StaticResource Mob}, ConverterParameter=14;1.2}" />
+            <Button Grid.Column="1" Classes="secondary-button" Content="Adicionar" Command="{Binding AddMedicationCommand}" />
+          </Grid>
+          <ItemsControl ItemsSource="{Binding Medications}">
+            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><Border Background="{DynamicResource PressioSurfaceBrush}" BorderBrush="{DynamicResource PressioBorderBrush}" BorderThickness="1" CornerRadius="20" Padding="10,6" Margin="0,4"><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="{Binding}" FontSize="13" Foreground="{DynamicResource PressioTextBrush}" VerticalAlignment="Center" /><Button Classes="icon-button" ToolTip.Tip="Remover" Command="{Binding $parent[ItemsControl].((vm:PatientFormViewModel)DataContext).RemoveMedicationCommand}" CommandParameter="{Binding}"><PathIcon Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" /></Button></StackPanel></Border></DataTemplate></ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
       </StackPanel>
     </ScrollViewer>
     <Border Grid.Row="1" BorderBrush="{DynamicResource PressioBorderBrush}" BorderThickness="0,1,0,0" Padding="20,12" IsVisible="{Binding !IsMobileLayout}">

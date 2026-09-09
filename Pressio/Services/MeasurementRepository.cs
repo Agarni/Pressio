@@ -22,17 +22,17 @@ public sealed class MeasurementRepository
     public IReadOnlyList<Patient> GetPatients()
     {
         using var connection = Open(); using var command = connection.CreateCommand();
-        command.CommandText = "SELECT Id, Name, BirthDate, Notes FROM Patients WHERE Deleted=0 ORDER BY Name";
+        command.CommandText = "SELECT Id, Name, BirthDate, Notes, FullName, Medications, HealthDetails, DoctorName FROM Patients WHERE Deleted=0 ORDER BY Name";
         using var reader = command.ExecuteReader(); var patients = new List<Patient>();
-        while (reader.Read()) patients.Add(new Patient(reader.GetInt64(0), reader.GetString(1), reader.IsDBNull(2) ? null : DateTime.Parse(reader.GetString(2)), reader.IsDBNull(3) ? null : reader.GetString(3)));
+        while (reader.Read()) patients.Add(new Patient(reader.GetInt64(0), reader.GetString(1), reader.IsDBNull(2) ? null : DateTime.Parse(reader.GetString(2)), reader.IsDBNull(3) ? null : reader.GetString(3), reader.IsDBNull(4) ? null : reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetString(5), reader.IsDBNull(6) ? null : reader.GetString(6), reader.IsDBNull(7) ? null : reader.GetString(7)));
         return patients;
     }
 
-    public long AddPatient(string name, DateTime? birthDate, string? notes)
+    public long AddPatient(string name, DateTime? birthDate, string? notes, string? fullName = null, string? medications = null, string? healthDetails = null, string? doctorName = null)
     {
         using var connection = Open(); using var command = connection.CreateCommand();
-        command.CommandText = "INSERT INTO Patients (Name, BirthDate, Notes, SyncId, UpdatedAtUtc, Deleted) VALUES ($name, $birth, $notes, $syncId, $updatedAt, 0); SELECT last_insert_rowid();";
-        command.Parameters.AddWithValue("$name", name); command.Parameters.AddWithValue("$birth", birthDate?.ToString("O") ?? (object)DBNull.Value); command.Parameters.AddWithValue("$notes", notes ?? (object)DBNull.Value);
+        command.CommandText = "INSERT INTO Patients (Name, BirthDate, Notes, FullName, Medications, HealthDetails, DoctorName, SyncId, UpdatedAtUtc, Deleted) VALUES ($name, $birth, $notes, $fullName, $medications, $healthDetails, $doctorName, $syncId, $updatedAt, 0); SELECT last_insert_rowid();";
+        command.Parameters.AddWithValue("$name", name); command.Parameters.AddWithValue("$birth", birthDate?.ToString("O") ?? (object)DBNull.Value); command.Parameters.AddWithValue("$notes", notes ?? (object)DBNull.Value); command.Parameters.AddWithValue("$fullName", fullName ?? (object)DBNull.Value); command.Parameters.AddWithValue("$medications", medications ?? (object)DBNull.Value); command.Parameters.AddWithValue("$healthDetails", healthDetails ?? (object)DBNull.Value); command.Parameters.AddWithValue("$doctorName", doctorName ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("$syncId", Guid.NewGuid().ToString("D")); command.Parameters.AddWithValue("$updatedAt", DateTime.UtcNow.ToString("O"));
         return (long)(command.ExecuteScalar() ?? 0L);
     }
@@ -40,8 +40,8 @@ public sealed class MeasurementRepository
     public void UpdatePatient(Patient patient)
     {
         using var connection = Open(); using var command = connection.CreateCommand();
-        command.CommandText = "UPDATE Patients SET Name=$name, BirthDate=$birth, Notes=$notes, UpdatedAtUtc=$updatedAt WHERE Id=$id";
-        command.Parameters.AddWithValue("$name", patient.Name); command.Parameters.AddWithValue("$birth", patient.BirthDate?.ToString("O") ?? (object)DBNull.Value); command.Parameters.AddWithValue("$notes", patient.Notes ?? (object)DBNull.Value); command.Parameters.AddWithValue("$updatedAt", DateTime.UtcNow.ToString("O")); command.Parameters.AddWithValue("$id", patient.Id); command.ExecuteNonQuery();
+        command.CommandText = "UPDATE Patients SET Name=$name, BirthDate=$birth, Notes=$notes, FullName=$fullName, Medications=$medications, HealthDetails=$healthDetails, DoctorName=$doctorName, UpdatedAtUtc=$updatedAt WHERE Id=$id";
+        command.Parameters.AddWithValue("$name", patient.Name); command.Parameters.AddWithValue("$birth", patient.BirthDate?.ToString("O") ?? (object)DBNull.Value); command.Parameters.AddWithValue("$notes", patient.Notes ?? (object)DBNull.Value); command.Parameters.AddWithValue("$fullName", patient.FullName ?? (object)DBNull.Value); command.Parameters.AddWithValue("$medications", patient.Medications ?? (object)DBNull.Value); command.Parameters.AddWithValue("$healthDetails", patient.HealthDetails ?? (object)DBNull.Value); command.Parameters.AddWithValue("$doctorName", patient.DoctorName ?? (object)DBNull.Value); command.Parameters.AddWithValue("$updatedAt", DateTime.UtcNow.ToString("O")); command.Parameters.AddWithValue("$id", patient.Id); command.ExecuteNonQuery();
     }
 
     public void DeletePatient(long id)
@@ -64,7 +64,7 @@ public sealed class MeasurementRepository
         using var connection = Open();
         var patientSyncId = (string?)ScalarString(connection, "SELECT SyncId FROM Patients WHERE Id=$id", patientId) ?? string.Empty;
         using var command = connection.CreateCommand();
-        command.CommandText = "INSERT INTO BloodPressureMeasurements (PatientId, PatientSyncId, Systolic, Diastolic, MeasuredAtUtc, MedicationTiming, Notes, Context, HeartRate, AtRest, Arm, Position, SyncId, UpdatedAtUtc, Deleted) VALUES ($patient, $patientSync, $systolic, $diastolic, $measuredAt, $medication, $notes, $context, $heartRate, $atRest, $arm, $position, $syncId, $updatedAt, 0); SELECT last_insert_rowid();";
+        command.CommandText = "INSERT INTO BloodPressureMeasurements (PatientId, PatientSyncId, Systolic, Diastolic, MeasuredAtUtc, MedicationTiming, Notes, Context, HeartRate, AtRest, Arm, Position, MedicationName, SyncId, UpdatedAtUtc, Deleted) VALUES ($patient, $patientSync, $systolic, $diastolic, $measuredAt, $medication, $notes, $context, $heartRate, $atRest, $arm, $position, $medicationName, $syncId, $updatedAt, 0); SELECT last_insert_rowid();";
         command.Parameters.AddWithValue("$patient", patientId); command.Parameters.AddWithValue("$patientSync", patientSyncId); BindMeasurement(command, measurement);
         command.Parameters.AddWithValue("$syncId", Guid.NewGuid().ToString("D")); command.Parameters.AddWithValue("$updatedAt", DateTime.UtcNow.ToString("O"));
         return (long)(command.ExecuteScalar() ?? 0L);
@@ -73,17 +73,17 @@ public sealed class MeasurementRepository
     public IReadOnlyList<BloodPressureMeasurement> GetRecent(long patientId, int limit = 100)
     {
         using var connection = Open(); using var command = connection.CreateCommand();
-        command.CommandText = "SELECT Id, Systolic, Diastolic, MeasuredAtUtc, MedicationTiming, Notes, Context, HeartRate, AtRest, Arm, Position FROM BloodPressureMeasurements WHERE PatientId=$patient AND Deleted=0 ORDER BY MeasuredAtUtc DESC LIMIT $limit";
+        command.CommandText = "SELECT Id, Systolic, Diastolic, MeasuredAtUtc, MedicationTiming, Notes, Context, HeartRate, AtRest, Arm, Position, MedicationName FROM BloodPressureMeasurements WHERE PatientId=$patient AND Deleted=0 ORDER BY MeasuredAtUtc DESC LIMIT $limit";
         command.Parameters.AddWithValue("$patient", patientId); command.Parameters.AddWithValue("$limit", limit);
         using var reader = command.ExecuteReader(); var items = new List<BloodPressureMeasurement>();
-        while (reader.Read()) items.Add(new BloodPressureMeasurement(reader.GetInt32(1), reader.GetInt32(2), DateTime.Parse(reader.GetString(3)).ToLocalTime(), Enum.Parse<MedicationTiming>(reader.GetString(4)), reader.IsDBNull(5) ? null : reader.GetString(5), (MeasurementContext)reader.GetInt32(6), reader.IsDBNull(7) ? null : reader.GetInt32(7), reader.GetInt32(8) != 0, reader.IsDBNull(9) ? Arm.NotInformed : Enum.Parse<Arm>(reader.GetString(9)), reader.IsDBNull(10) ? BodyPosition.NotInformed : Enum.Parse<BodyPosition>(reader.GetString(10)), reader.GetInt64(0)));
+        while (reader.Read()) items.Add(new BloodPressureMeasurement(reader.GetInt32(1), reader.GetInt32(2), DateTime.Parse(reader.GetString(3)).ToLocalTime(), Enum.Parse<MedicationTiming>(reader.GetString(4)), reader.IsDBNull(5) ? null : reader.GetString(5), (MeasurementContext)reader.GetInt32(6), reader.IsDBNull(7) ? null : reader.GetInt32(7), reader.GetInt32(8) != 0, reader.IsDBNull(9) ? Arm.NotInformed : Enum.Parse<Arm>(reader.GetString(9)), reader.IsDBNull(10) ? BodyPosition.NotInformed : Enum.Parse<BodyPosition>(reader.GetString(10)), reader.GetInt64(0), reader.IsDBNull(11) ? null : reader.GetString(11)));
         return items;
     }
 
     public void Update(BloodPressureMeasurement measurement)
     {
         using var connection = Open(); using var command = connection.CreateCommand();
-        command.CommandText = "UPDATE BloodPressureMeasurements SET Systolic=$systolic, Diastolic=$diastolic, MeasuredAtUtc=$measuredAt, MedicationTiming=$medication, Notes=$notes, Context=$context, HeartRate=$heartRate, AtRest=$atRest, Arm=$arm, Position=$position, UpdatedAtUtc=$updatedAt WHERE Id=$id";
+        command.CommandText = "UPDATE BloodPressureMeasurements SET Systolic=$systolic, Diastolic=$diastolic, MeasuredAtUtc=$measuredAt, MedicationTiming=$medication, Notes=$notes, Context=$context, HeartRate=$heartRate, AtRest=$atRest, Arm=$arm, Position=$position, MedicationName=$medicationName, UpdatedAtUtc=$updatedAt WHERE Id=$id";
         BindMeasurement(command, measurement); command.Parameters.AddWithValue("$updatedAt", DateTime.UtcNow.ToString("O")); command.Parameters.AddWithValue("$id", measurement.Id); command.ExecuteNonQuery();
     }
 
@@ -92,16 +92,16 @@ public sealed class MeasurementRepository
     public IReadOnlyList<SyncPatient> GetSyncPatients()
     {
         using var connection = Open(); using var command = connection.CreateCommand();
-        command.CommandText = "SELECT SyncId, Name, BirthDate, Notes, UpdatedAtUtc, Deleted FROM Patients";
+        command.CommandText = "SELECT SyncId, Name, BirthDate, Notes, FullName, Medications, HealthDetails, DoctorName, UpdatedAtUtc, Deleted FROM Patients";
         using var reader = command.ExecuteReader(); var list = new List<SyncPatient>();
-        while (reader.Read()) list.Add(new SyncPatient { SyncId = reader.GetString(0), Name = reader.GetString(1), BirthDate = reader.IsDBNull(2) ? null : DateTime.Parse(reader.GetString(2)), Notes = reader.IsDBNull(3) ? null : reader.GetString(3), UpdatedAt = ParseDateTime(reader, 4), Deleted = reader.GetInt32(5) != 0 });
+        while (reader.Read()) list.Add(new SyncPatient { SyncId = reader.GetString(0), Name = reader.GetString(1), BirthDate = reader.IsDBNull(2) ? null : DateTime.Parse(reader.GetString(2)), Notes = reader.IsDBNull(3) ? null : reader.GetString(3), FullName = reader.IsDBNull(4) ? null : reader.GetString(4), Medications = reader.IsDBNull(5) ? null : reader.GetString(5), HealthDetails = reader.IsDBNull(6) ? null : reader.GetString(6), DoctorName = reader.IsDBNull(7) ? null : reader.GetString(7), UpdatedAt = ParseDateTime(reader, 8), Deleted = reader.GetInt32(9) != 0 });
         return list;
     }
 
     public IReadOnlyList<SyncMeasurement> GetSyncMeasurements()
     {
         using var connection = Open(); using var command = connection.CreateCommand();
-        command.CommandText = "SELECT SyncId, PatientSyncId, Systolic, Diastolic, MeasuredAtUtc, MedicationTiming, Notes, Context, HeartRate, AtRest, Arm, Position, UpdatedAtUtc, Deleted FROM BloodPressureMeasurements";
+        command.CommandText = "SELECT SyncId, PatientSyncId, Systolic, Diastolic, MeasuredAtUtc, MedicationTiming, Notes, Context, HeartRate, AtRest, Arm, Position, MedicationName, UpdatedAtUtc, Deleted FROM BloodPressureMeasurements";
         using var reader = command.ExecuteReader(); var list = new List<SyncMeasurement>();
         while (reader.Read())
             list.Add(new SyncMeasurement
@@ -118,8 +118,9 @@ public sealed class MeasurementRepository
                 AtRest = reader.GetInt32(9) != 0,
                 Arm = reader.IsDBNull(10) ? Arm.NotInformed : Enum.Parse<Arm>(reader.GetString(10)),
                 Position = reader.IsDBNull(11) ? BodyPosition.NotInformed : Enum.Parse<BodyPosition>(reader.GetString(11)),
-                UpdatedAt = ParseDateTime(reader, 12),
-                Deleted = reader.GetInt32(13) != 0
+                MedicationName = reader.IsDBNull(12) ? null : reader.GetString(12),
+                UpdatedAt = ParseDateTime(reader, 13),
+                Deleted = reader.GetInt32(14) != 0
             });
         return list;
     }
@@ -142,14 +143,14 @@ public sealed class MeasurementRepository
         if (existing is not null)
         {
             using var update = connection.CreateCommand();
-            update.CommandText = "UPDATE Patients SET Name=$name, BirthDate=$birth, Notes=$notes, SyncId=$syncId, UpdatedAtUtc=$updatedAt, Deleted=0 WHERE Id=$id";
-            update.Parameters.AddWithValue("$name", patient.Name); update.Parameters.AddWithValue("$birth", patient.BirthDate?.ToString("O") ?? (object)DBNull.Value); update.Parameters.AddWithValue("$notes", patient.Notes ?? (object)DBNull.Value); update.Parameters.AddWithValue("$syncId", patient.SyncId); update.Parameters.AddWithValue("$updatedAt", patient.UpdatedAt.UtcDateTime.ToString("O")); update.Parameters.AddWithValue("$id", existing.Value);
+            update.CommandText = "UPDATE Patients SET Name=$name, BirthDate=$birth, Notes=$notes, FullName=$fullName, Medications=$medications, HealthDetails=$healthDetails, DoctorName=$doctorName, SyncId=$syncId, UpdatedAtUtc=$updatedAt, Deleted=0 WHERE Id=$id";
+            update.Parameters.AddWithValue("$name", patient.Name); update.Parameters.AddWithValue("$birth", patient.BirthDate?.ToString("O") ?? (object)DBNull.Value); update.Parameters.AddWithValue("$notes", patient.Notes ?? (object)DBNull.Value); update.Parameters.AddWithValue("$fullName", patient.FullName ?? (object)DBNull.Value); update.Parameters.AddWithValue("$medications", patient.Medications ?? (object)DBNull.Value); update.Parameters.AddWithValue("$healthDetails", patient.HealthDetails ?? (object)DBNull.Value); update.Parameters.AddWithValue("$doctorName", patient.DoctorName ?? (object)DBNull.Value); update.Parameters.AddWithValue("$syncId", patient.SyncId); update.Parameters.AddWithValue("$updatedAt", patient.UpdatedAt.UtcDateTime.ToString("O")); update.Parameters.AddWithValue("$id", existing.Value);
             update.ExecuteNonQuery();
             return existing.Value;
         }
         using var insert = connection.CreateCommand();
-        insert.CommandText = "INSERT INTO Patients (Name, BirthDate, Notes, SyncId, UpdatedAtUtc, Deleted) VALUES ($name, $birth, $notes, $syncId, $updatedAt, 0); SELECT last_insert_rowid();";
-        insert.Parameters.AddWithValue("$name", patient.Name); insert.Parameters.AddWithValue("$birth", patient.BirthDate?.ToString("O") ?? (object)DBNull.Value); insert.Parameters.AddWithValue("$notes", patient.Notes ?? (object)DBNull.Value); insert.Parameters.AddWithValue("$syncId", patient.SyncId); insert.Parameters.AddWithValue("$updatedAt", patient.UpdatedAt.UtcDateTime.ToString("O"));
+        insert.CommandText = "INSERT INTO Patients (Name, BirthDate, Notes, FullName, Medications, HealthDetails, DoctorName, SyncId, UpdatedAtUtc, Deleted) VALUES ($name, $birth, $notes, $fullName, $medications, $healthDetails, $doctorName, $syncId, $updatedAt, 0); SELECT last_insert_rowid();";
+        insert.Parameters.AddWithValue("$name", patient.Name); insert.Parameters.AddWithValue("$birth", patient.BirthDate?.ToString("O") ?? (object)DBNull.Value); insert.Parameters.AddWithValue("$notes", patient.Notes ?? (object)DBNull.Value); insert.Parameters.AddWithValue("$fullName", patient.FullName ?? (object)DBNull.Value); insert.Parameters.AddWithValue("$medications", patient.Medications ?? (object)DBNull.Value); insert.Parameters.AddWithValue("$healthDetails", patient.HealthDetails ?? (object)DBNull.Value); insert.Parameters.AddWithValue("$doctorName", patient.DoctorName ?? (object)DBNull.Value); insert.Parameters.AddWithValue("$syncId", patient.SyncId); insert.Parameters.AddWithValue("$updatedAt", patient.UpdatedAt.UtcDateTime.ToString("O"));
         return (long)(insert.ExecuteScalar() ?? 0L);
     }
 
@@ -163,16 +164,16 @@ public sealed class MeasurementRepository
         if (existing is not null)
         {
             using var update = connection.CreateCommand();
-            update.CommandText = "UPDATE BloodPressureMeasurements SET PatientId=$patient, PatientSyncId=$patientSync, Systolic=$systolic, Diastolic=$diastolic, MeasuredAtUtc=$measuredAt, MedicationTiming=$medication, Notes=$notes, Context=$context, HeartRate=$heartRate, AtRest=$atRest, Arm=$arm, Position=$position, SyncId=$syncId, UpdatedAtUtc=$updatedAt, Deleted=0 WHERE Id=$id";
-            BindMeasurement(update, new BloodPressureMeasurement(measurement.Systolic, measurement.Diastolic, measurement.MeasuredAtUtc.ToLocalTime(), measurement.MedicationTiming, measurement.Notes, measurement.Context, measurement.HeartRate, measurement.AtRest, measurement.Arm, measurement.Position));
+            update.CommandText = "UPDATE BloodPressureMeasurements SET PatientId=$patient, PatientSyncId=$patientSync, Systolic=$systolic, Diastolic=$diastolic, MeasuredAtUtc=$measuredAt, MedicationTiming=$medication, Notes=$notes, Context=$context, HeartRate=$heartRate, AtRest=$atRest, Arm=$arm, Position=$position, MedicationName=$medicationName, SyncId=$syncId, UpdatedAtUtc=$updatedAt, Deleted=0 WHERE Id=$id";
+            BindMeasurement(update, new BloodPressureMeasurement(measurement.Systolic, measurement.Diastolic, measurement.MeasuredAtUtc.ToLocalTime(), measurement.MedicationTiming, measurement.Notes, measurement.Context, measurement.HeartRate, measurement.AtRest, measurement.Arm, measurement.Position, 0, measurement.MedicationName));
             update.Parameters.AddWithValue("$patient", patientId); update.Parameters.AddWithValue("$patientSync", measurement.PatientSyncId); update.Parameters.AddWithValue("$syncId", measurement.SyncId); update.Parameters.AddWithValue("$updatedAt", measurement.UpdatedAt.UtcDateTime.ToString("O")); update.Parameters.AddWithValue("$id", existing.Value);
             update.ExecuteNonQuery();
         }
         else
         {
             using var insert = connection.CreateCommand();
-            insert.CommandText = "INSERT INTO BloodPressureMeasurements (PatientId, PatientSyncId, Systolic, Diastolic, MeasuredAtUtc, MedicationTiming, Notes, Context, HeartRate, AtRest, Arm, Position, SyncId, UpdatedAtUtc, Deleted) VALUES ($patient, $patientSync, $systolic, $diastolic, $measuredAt, $medication, $notes, $context, $heartRate, $atRest, $arm, $position, $syncId, $updatedAt, 0); SELECT last_insert_rowid();";
-            BindMeasurement(insert, new BloodPressureMeasurement(measurement.Systolic, measurement.Diastolic, measurement.MeasuredAtUtc.ToLocalTime(), measurement.MedicationTiming, measurement.Notes, measurement.Context, measurement.HeartRate, measurement.AtRest, measurement.Arm, measurement.Position));
+            insert.CommandText = "INSERT INTO BloodPressureMeasurements (PatientId, PatientSyncId, Systolic, Diastolic, MeasuredAtUtc, MedicationTiming, Notes, Context, HeartRate, AtRest, Arm, Position, MedicationName, SyncId, UpdatedAtUtc, Deleted) VALUES ($patient, $patientSync, $systolic, $diastolic, $measuredAt, $medication, $notes, $context, $heartRate, $atRest, $arm, $position, $medicationName, $syncId, $updatedAt, 0); SELECT last_insert_rowid();";
+            BindMeasurement(insert, new BloodPressureMeasurement(measurement.Systolic, measurement.Diastolic, measurement.MeasuredAtUtc.ToLocalTime(), measurement.MedicationTiming, measurement.Notes, measurement.Context, measurement.HeartRate, measurement.AtRest, measurement.Arm, measurement.Position, 0, measurement.MedicationName));
             insert.Parameters.AddWithValue("$patient", patientId); insert.Parameters.AddWithValue("$patientSync", measurement.PatientSyncId); insert.Parameters.AddWithValue("$syncId", measurement.SyncId); insert.Parameters.AddWithValue("$updatedAt", measurement.UpdatedAt.UtcDateTime.ToString("O"));
             insert.ExecuteNonQuery();
         }
@@ -213,7 +214,7 @@ public sealed class MeasurementRepository
     private static DateTimeOffset ParseDateTime(SqliteDataReader reader, int ordinal) =>
         DateTimeOffset.Parse(reader.GetString(ordinal), System.Globalization.CultureInfo.InvariantCulture);
 
-    private static void BindMeasurement(SqliteCommand command, BloodPressureMeasurement m) { command.Parameters.AddWithValue("$systolic", m.Systolic); command.Parameters.AddWithValue("$diastolic", m.Diastolic); command.Parameters.AddWithValue("$measuredAt", m.MeasuredAt.ToUniversalTime().ToString("O")); command.Parameters.AddWithValue("$medication", m.MedicationTiming.ToString()); command.Parameters.AddWithValue("$notes", m.Notes ?? (object)DBNull.Value); command.Parameters.AddWithValue("$context", (int)m.Context); command.Parameters.AddWithValue("$heartRate", m.HeartRate is { } hr ? hr : (object)DBNull.Value); command.Parameters.AddWithValue("$atRest", m.AtRest ? 1 : 0); command.Parameters.AddWithValue("$arm", m.Arm.ToString()); command.Parameters.AddWithValue("$position", m.Position.ToString()); }
+    private static void BindMeasurement(SqliteCommand command, BloodPressureMeasurement m) { command.Parameters.AddWithValue("$systolic", m.Systolic); command.Parameters.AddWithValue("$diastolic", m.Diastolic); command.Parameters.AddWithValue("$measuredAt", m.MeasuredAt.ToUniversalTime().ToString("O")); command.Parameters.AddWithValue("$medication", m.MedicationTiming.ToString()); command.Parameters.AddWithValue("$notes", m.Notes ?? (object)DBNull.Value); command.Parameters.AddWithValue("$context", (int)m.Context); command.Parameters.AddWithValue("$heartRate", m.HeartRate is { } hr ? hr : (object)DBNull.Value); command.Parameters.AddWithValue("$atRest", m.AtRest ? 1 : 0); command.Parameters.AddWithValue("$arm", m.Arm.ToString()); command.Parameters.AddWithValue("$position", m.Position.ToString()); command.Parameters.AddWithValue("$medicationName", m.MedicationName ?? (object)DBNull.Value); }
 
     private static void EnsureColumn(SqliteConnection connection, string table, string column, string definition)
     {
@@ -244,10 +245,15 @@ public sealed class MeasurementRepository
         EnsureColumn(connection, "Patients", "SyncId", "TEXT NULL");
         EnsureColumn(connection, "Patients", "UpdatedAtUtc", "TEXT NULL");
         EnsureColumn(connection, "Patients", "Deleted", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn(connection, "Patients", "FullName", "TEXT NULL");
+        EnsureColumn(connection, "Patients", "Medications", "TEXT NULL");
+        EnsureColumn(connection, "Patients", "HealthDetails", "TEXT NULL");
+        EnsureColumn(connection, "Patients", "DoctorName", "TEXT NULL");
         EnsureColumn(connection, "BloodPressureMeasurements", "SyncId", "TEXT NULL");
         EnsureColumn(connection, "BloodPressureMeasurements", "PatientSyncId", "TEXT NULL");
         EnsureColumn(connection, "BloodPressureMeasurements", "UpdatedAtUtc", "TEXT NULL");
         EnsureColumn(connection, "BloodPressureMeasurements", "Deleted", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn(connection, "BloodPressureMeasurements", "MedicationName", "TEXT NULL");
 
         using var backfill = connection.CreateCommand();
         backfill.CommandText = @"UPDATE Patients SET SyncId = lower(hex(randomblob(16))) WHERE SyncId IS NULL OR SyncId = '';
