@@ -52,8 +52,6 @@ public class MainViewModel : ViewModelBase
     public Geometry SystolicLine { get => _systolicLine; private set => this.RaiseAndSetIfChanged(ref _systolicLine, value); }
     private Geometry _diastolicLine = new StreamGeometry();
     public Geometry DiastolicLine { get => _diastolicLine; private set => this.RaiseAndSetIfChanged(ref _diastolicLine, value); }
-    private Geometry _chartLeaderGeometry = new StreamGeometry();
-    public Geometry ChartLeaderGeometry { get => _chartLeaderGeometry; private set => this.RaiseAndSetIfChanged(ref _chartLeaderGeometry, value); }
     public ObservableCollection<ChartPointLabel> ChartLabels { get; } = new();
     public ObservableCollection<ChartPointMarker> ChartMarkers { get; } = new();
     public string BeforeMedicationSummary { get; private set; } = "—";
@@ -1144,7 +1142,6 @@ public class MainViewModel : ViewModelBase
         {
             SystolicLine = new StreamGeometry();
             DiastolicLine = new StreamGeometry();
-            ChartLeaderGeometry = new StreamGeometry();
             ChartLabels.Clear();
             ChartMarkers.Clear();
         }
@@ -1158,32 +1155,20 @@ public class MainViewModel : ViewModelBase
             var diastolic = chartData.Select((x, i) => new Point(X(i), Y(x.Diastolic))).ToList();
             SystolicLine = ChartPathBuilder.BuildSmooth(systolic);
             DiastolicLine = ChartPathBuilder.BuildSmooth(diastolic);
-            var leader = new StreamGeometry();
-            using (var ctx = leader.Open())
+            for (var i = 0; i < chartData.Count; i++)
             {
-                for (var i = 0; i < chartData.Count; i++)
-                {
-                    var labelText = BloodPressureMeasurement.Format(chartData[i].Systolic, chartData[i].Diastolic);
-                    var labelW = Math.Max(30, labelText.Length * 6.5);
-                    var lx = (int)Math.Clamp(X(i) - labelW / 2, 4, 500 - labelW - 4);
-                    var ly = i % 2 == 0
-                        ? (int)Math.Clamp(Y(chartData[i].Systolic) - 24, 4, 128)
-                        : (int)Math.Clamp(Y(chartData[i].Diastolic) + 8, 4, 128);
-                    ChartLabels.Add(new ChartPointLabel(labelText, lx, ly));
-                    var pointY = i % 2 == 0 ? Y(chartData[i].Systolic) : Y(chartData[i].Diastolic);
-                    var anchorY = i % 2 == 0 ? ly + 12 : ly - 5;
-                    // Limita ao retângulo do gráfico para nenhuma linha-guia sair da área.
-                    var lx1 = Math.Clamp(lx + labelW / 2, 2, 498);
-                    var ly1 = Math.Clamp(anchorY, 2, 148);
-                    var lx2 = Math.Clamp(X(i), 2, 498);
-                    var ly2 = Math.Clamp(pointY, 2, 148);
-                    ctx.BeginFigure(new Point(lx1, ly1), false);
-                    ctx.LineTo(new Point(lx2, ly2));
-                    ChartMarkers.Add(new ChartPointMarker((int)X(i), (int)Y(chartData[i].Systolic), chartData[i].Category));
-                    ChartMarkers.Add(new ChartPointMarker((int)X(i), (int)Y(chartData[i].Diastolic), chartData[i].Category));
-                }
+                var labelText = BloodPressureMeasurement.Format(chartData[i].Systolic, chartData[i].Diastolic);
+                // Largura estimada da etiqueta (para não sair da área nem colidir).
+                var labelW = Math.Max(30, labelText.Length * 6.5);
+                var lx = (int)Math.Clamp(X(i) - labelW / 2, 4, 500 - labelW - 4);
+                // Zigue-zague: pares acima da linha, ímpares abaixo, para não sobrepor.
+                var ly = i % 2 == 0
+                    ? (int)Math.Clamp(Y(chartData[i].Systolic) - 24, 4, 128)
+                    : (int)Math.Clamp(Y(chartData[i].Diastolic) + 8, 4, 128);
+                ChartLabels.Add(new ChartPointLabel(labelText, lx, ly));
+                ChartMarkers.Add(new ChartPointMarker((int)X(i), (int)Y(chartData[i].Systolic), chartData[i].Category));
+                ChartMarkers.Add(new ChartPointMarker((int)X(i), (int)Y(chartData[i].Diastolic), chartData[i].Category));
             }
-            ChartLeaderGeometry = leader;
         }
 
         this.RaisePropertyChanged(nameof(LastReading));
