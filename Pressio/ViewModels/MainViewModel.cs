@@ -1168,13 +1168,13 @@ public class MainViewModel : ViewModelBase
                 var lx = (int)Math.Clamp(X(i) - labelW / 2, 4, 500 - labelW - 4);
                 // Zigue-zague: pares acima da linha, ímpares abaixo, para não sobrepor.
                 var ly = i % 2 == 0
-                    ? (int)Math.Clamp(Y(chartData[i].Systolic) - 26, 4, 134)
-                    : (int)Math.Clamp(Y(chartData[i].Diastolic) + 12, 4, 140);
+                    ? (int)Math.Clamp(Y(chartData[i].Systolic) - 24, 4, 128)
+                    : (int)Math.Clamp(Y(chartData[i].Diastolic) + 8, 4, 128);
                 ChartLabels.Add(new ChartPointLabel(labelText, lx, ly));
                 // Linha-guia tracejada ligando a etiqueta ao ponto da mesma aferição.
                 var pointY = i % 2 == 0 ? Y(chartData[i].Systolic) : Y(chartData[i].Diastolic);
-                var anchorY = i % 2 == 0 ? ly + 10 : ly - 6;
-                ChartLeaderLines.Add(new ChartLeaderLine(new Point(lx + labelW / 2, anchorY), new Point(X(i), pointY)));
+                var anchorY = i % 2 == 0 ? ly + 12 : ly - 5;
+                ChartLeaderLines.Add(new ChartLeaderLine(lx + labelW / 2, anchorY, X(i), pointY));
                 ChartMarkers.Add(new ChartPointMarker((int)X(i), (int)Y(chartData[i].Systolic), chartData[i].Category));
                 ChartMarkers.Add(new ChartPointMarker((int)X(i), (int)Y(chartData[i].Diastolic), chartData[i].Category));
             }

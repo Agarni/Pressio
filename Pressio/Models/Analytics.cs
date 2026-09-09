@@ -22,6 +22,10 @@ public sealed record ChartPointMarker(int X, int Y, PressureCategory Category)
 }
 
 // Linha-guia tracejada ligando a etiqueta de valor ao ponto correspondente (mesma aferição).
-public sealed record ChartLeaderLine(Point Start, Point End);
+public sealed record ChartLeaderLine(double X1, double Y1, double X2, double Y2)
+{
+    public Point Start => new(X1, Y1);
+    public Point Delta => new(X2 - X1, Y2 - Y1);
+}
 
 public sealed record ExportFileRequest(string FileName, string Extension, string Kind, string? StartDirectory);
