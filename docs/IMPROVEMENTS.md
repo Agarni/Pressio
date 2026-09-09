@@ -28,6 +28,10 @@
 - ✔ **Correlações com defasagem temporal + significância** — compara a pressão nas horas seguintes ao fator vs. sem o fator recente; mín. de amostras e selo "Tendência".
 - ✔ **Testes de integração (lógica)** — `MeasurementFilter` (filtros) e `ReminderDueCalculator` (lembretes devidos) extraídos e testados; dashboard já coberto.
 - ✔ **Tela "Sobre" com diagnóstico** — versão, caminho/tamanho do banco e último sync.
+- ✔ **Ações de registro no próprio card (mobile)** — Editar/Excluir aparecem **somente no card selecionado** (via pseudo-classe `:selected`), sem cortar texto; lápis/lixeira do topo removidos.
+- ✔ **Padrão de nova aferição** — Antes da medicação, Sentado, braço Esquerdo.
+- ✔ **Notificações Android corretas** — permissão `POST_NOTIFICATIONS` em runtime, alarme **exato** (`setExactAndAllowWhileIdle`), `contentIntent` para abrir o app ao tocar, e o `SaveReminder` só agenda se habilitado.
+- ✔ **Sync ao fechar/pausar** — desktop aguarda antes de sair; Android (`OnStop`) e iOS (`DidEnterBackground`) sincronizam ao ir para segundo plano.
 
 ---
 
