@@ -1155,6 +1155,8 @@ public class MainViewModel : ViewModelBase
             var diastolic = chartData.Select((x, i) => new Point(X(i), Y(x.Diastolic))).ToList();
             SystolicLine = ChartPathBuilder.BuildSmooth(systolic);
             DiastolicLine = ChartPathBuilder.BuildSmooth(diastolic);
+            ChartLabels.Clear();
+            ChartMarkers.Clear();
             for (var i = 0; i < chartData.Count; i++)
             {
                 var labelText = BloodPressureMeasurement.Format(chartData[i].Systolic, chartData[i].Diastolic);
