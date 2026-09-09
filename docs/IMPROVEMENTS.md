@@ -59,7 +59,7 @@ Alternativas sem servidor (candidatas, da mais simples à mais robusta):
 
 - ✔ **Insights de correlação** — compara a pressão média nas horas seguintes a cada fator (café, estresse etc.) com as sem o fator recente; mínimo de amostras por grupo e selo "Tendência" quando a amostra é pequena.
 - **Lembrete pós-consulta** 🟢 — sugestão de nova rotina/aferição ao final.
-- ✔ **Histórico com mais contexto no gráfico** — pontos coloridos por faixa e seletor de período (Hoje/7/15/30 dias) no gráfico.
+- ✔ **Histórico com mais contexto no gráfico** — pontos coloridos por faixa, seletor de período (Hoje/7/15/30 dias) e rótulos em zigue-zague com clamp (a última etiqueta não é cortada, sem sobreposição); gráfico responsivo (`Viewbox Uniform`, sem distorção).
 
 ## 3. Inovação (diferenciação)
 
