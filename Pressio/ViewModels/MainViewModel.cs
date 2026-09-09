@@ -1159,7 +1159,7 @@ public class MainViewModel : ViewModelBase
             ChartMarkers.Clear();
             for (var i = 0; i < chartData.Count; i++)
             {
-                ChartLabels.Add(new ChartPointLabel(BloodPressureMeasurement.Format(chartData[i].Systolic, chartData[i].Diastolic), (int)Math.Clamp(X(i) - 26, 4, 442), (int)Math.Clamp(Y(chartData[i].Systolic) - 26, 4, 134)));
+                ChartLabels.Add(new ChartPointLabel(BloodPressureMeasurement.Format(chartData[i].Systolic, chartData[i].Diastolic), (int)Math.Clamp(X(i) - 24, 4, 474), (int)Math.Clamp(Y(chartData[i].Systolic) - 26, 4, 134)));
                 ChartMarkers.Add(new ChartPointMarker((int)X(i), (int)Y(chartData[i].Systolic), chartData[i].Category));
                 ChartMarkers.Add(new ChartPointMarker((int)X(i), (int)Y(chartData[i].Diastolic), chartData[i].Category));
             }
