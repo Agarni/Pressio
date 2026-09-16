@@ -7,10 +7,19 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# O workload .NET iOS 26.5 exige Xcode 26.6. Use XCODE_DEV_DIR para apontar um Xcode
+# específico; senão, procura o Xcode 26.6/26.5 em /Applications automaticamente.
+if [[ -z "${DEVELOPER_DIR:-}" ]]; then
+  for cand in "${XCODE_DEV_DIR:-}" /Applications/Xcode_26.6.app /Applications/Xcode_26.5.app; do
+    [[ -n "$cand" && -d "$cand/Contents/Developer" ]] && export DEVELOPER_DIR="$cand/Contents/Developer" && break
+  done
+fi
+[[ -n "${DEVELOPER_DIR:-}" ]] && echo ">> Usando Xcode: $DEVELOPER_DIR"
+
 CONFIG="${CONFIG:-Release}"
 RID=ios-arm64
 
-UDID="${1:-$(xcrun devicectl list devices 2>/dev/null | rg -o 'D0ACBB72-[0-9A-F-]+' | head -1 || true)}"
+UDID="${1:-$(xcrun devicectl list devices 2>/dev/null | rg 'connected' | rg 'physical' | rg -o '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4,}' | head -1 || true)}"
 if [[ -z "$UDID" ]]; then
   echo "Nenhum iPhone detectado. Conecte e desbloqueie o aparelho." >&2
   exit 1

@@ -4,6 +4,15 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# O workload .NET iOS 26.5 exige Xcode 26.6. Use XCODE_DEV_DIR para apontar um Xcode
+# específico; senão, procura o Xcode 26.6/26.5 em /Applications automaticamente.
+if [[ -z "${DEVELOPER_DIR:-}" ]]; then
+  for cand in "${XCODE_DEV_DIR:-}" /Applications/Xcode_26.6.app /Applications/Xcode_26.5.app; do
+    [[ -n "$cand" && -d "$cand/Contents/Developer" ]] && export DEVELOPER_DIR="$cand/Contents/Developer" && break
+  done
+fi
+[[ -n "${DEVELOPER_DIR:-}" ]] && echo ">> Usando Xcode: $DEVELOPER_DIR"
+
 CONFIG="${CONFIG:-Release}"
 RID=ios-arm64
 
